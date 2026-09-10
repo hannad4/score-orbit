@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -44,7 +43,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -84,6 +82,20 @@ private fun nearestSeat(point: Offset, center: Offset, total: Int): Int {
     return best
 }
 
+/**
+ * Distance from [center] along [dir] to the inside of the rect
+ * [0, w]x[0, h] shrunk by [margin]. Used to push score labels out to the
+ * screen edges like the iOS tabletop layout.
+ */
+private fun rayToEdge(center: Offset, dir: Offset, w: Float, h: Float, margin: Float): Float {
+    var t = Float.MAX_VALUE
+    if (dir.x > 1e-6f) t = min(t, (w - margin - center.x) / dir.x)
+    else if (dir.x < -1e-6f) t = min(t, (margin - center.x) / dir.x)
+    if (dir.y > 1e-6f) t = min(t, (h - margin - center.y) / dir.y)
+    else if (dir.y < -1e-6f) t = min(t, (margin - center.y) / dir.y)
+    return if (t.isFinite()) t.coerceAtLeast(0f) else 0f
+}
+
 @Composable
 fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     val ctx = LocalContext.current
@@ -94,9 +106,12 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     var pending by remember(game.id) { mutableIntStateOf(0) }
     var accRadians by remember(game.id) { mutableFloatStateOf(0f) }
     var lastAngle by remember { mutableFloatStateOf(Float.NaN) }
+    // Last committed delta, flashed in the middle of the ring (iOS behavior).
+    var lastCommit by remember(game.id) { mutableStateOf<Pair<Int, Int>?>(null) }
 
     val turn = turnValue(game.step)
-    val activePlayer = game.players.firstOrNull { it.id == activeId }
+    val activeIndex = game.players.indexOfFirst { it.id == activeId }
+    val activePlayer = activeIndex.takeIf { it >= 0 }?.let { game.players[it] }
 
     fun resetGesture() {
         activeId = null
@@ -106,10 +121,13 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     }
 
     fun commitGesture() {
-        val id = activeId
+        val player = activePlayer
         val delta = pending
         resetGesture()
-        if (id != null && delta != 0) viewModel.addScore(id, delta)
+        if (player != null && delta != 0) {
+            viewModel.addScore(player.id, delta)
+            if (game.keepLastVisible) lastCommit = player.color to delta
+        }
     }
 
     Column(
@@ -126,14 +144,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Score history", tint = Color.White.copy(alpha = 0.85f))
             }
             Spacer(modifier = Modifier.weight(1f))
-            Text(
-                text = game.name,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.5f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.weight(1f))
             IconButton(onClick = { viewModel.go(AppScreen.Settings) }) {
                 Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White.copy(alpha = 0.85f))
             }
@@ -147,44 +157,33 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
 
             val cx = wPx / 2f
             val cy = hPx / 2f
+            val center = Offset(cx, cy)
             val n = game.players.size
             val minDim = min(wPx, hPx)
             fun dp(px: Float): Dp = with(density) { px.toDp() }
 
-            // --- Fit the ring + dots + labels inside the screen. ---
-            // Labels live in rotation-proof square boxes so sideways seats
-            // need no more room than upright ones.
-            val labelBoxPx = when {
-                n <= 4 -> with(density) { 96.dp.toPx() }
-                n <= 6 -> with(density) { 80.dp.toPx() }
-                n <= 9 -> with(density) { 64.dp.toPx() }
-                else -> with(density) { 54.dp.toPx() }
-            }
-            val gapPx = with(density) { 22.dp.toPx() }
-            val marginPx = with(density) { 6.dp.toPx() }
-            var ringR = minDim * 0.30f
-            var dotD = with(density) { 56.dp.toPx() }
-            repeat(3) {
-                val share = (2 * PI.toFloat() * ringR / n) * 0.68f
-                dotD = share.coerceIn(
-                    with(density) { 32.dp.toPx() },
-                    with(density) { 64.dp.toPx() },
-                )
-                val need = ringR + dotD / 2f + gapPx + labelBoxPx / 2f + marginPx
-                val avail = minDim / 2f
-                if (need > avail) ringR -= (need - avail)
-            }
-            ringR = ringR.coerceAtLeast(with(density) { 40.dp.toPx() })
+            // Ring sized like iOS (~0.30 of the narrow side); dots sit on it.
+            val ringR = minDim * 0.30f
+            val share = (2 * PI.toFloat() * ringR / n) * 0.68f
+            val dotD = share.coerceIn(
+                with(density) { 34.dp.toPx() },
+                with(density) { 64.dp.toPx() },
+            )
             val trackWidth = (dotD * 0.55f).coerceIn(
                 with(density) { 10.dp.toPx() },
                 with(density) { 26.dp.toPx() },
             )
-            val labelR = ringR + dotD / 2f + gapPx
-            val scoreSp = (labelBoxPx * 0.42f / density.density).coerceIn(18f, 60f)
 
-            // Clamp helper so labels can never leave the screen.
-            fun clampX(x: Float) = x.coerceIn(labelBoxPx / 2f + 2f, wPx - labelBoxPx / 2f - 2f)
-            fun clampY(y: Float) = y.coerceIn(labelBoxPx / 2f + 2f, hPx - labelBoxPx / 2f - 2f)
+            // Score boxes: rotation-proof squares, sized by player count.
+            val labelBoxPx = when {
+                n <= 3 -> with(density) { 140.dp.toPx() }
+                n <= 4 -> with(density) { 124.dp.toPx() }
+                n <= 6 -> with(density) { 100.dp.toPx() }
+                n <= 9 -> with(density) { 84.dp.toPx() }
+                else -> with(density) { 72.dp.toPx() }
+            }
+            val scoreSp = (labelBoxPx * 0.44f / density.density).coerceIn(20f, 64f)
+            val edgeMarginPx = with(density) { 8.dp.toPx() }
 
             Box(
                 modifier = Modifier
@@ -194,9 +193,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             onDragStart = { offset ->
                                 val g = latestGame
                                 if (g.players.isEmpty()) return@detectDragGestures
-                                val seat = nearestSeat(offset, Offset(cx, cy), g.players.size)
-                                val id = g.players[seat].id
-                                activeId = id
+                                val seat = nearestSeat(offset, center, g.players.size)
+                                activeId = g.players[seat].id
+                                lastCommit = null
                                 lastAngle = atan2(
                                     (offset.y - cy).toDouble(),
                                     (offset.x - cx).toDouble()
@@ -238,16 +237,32 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         )
                     }
             ) {
-                // Track ring + progress arc, drawn on a canvas bounded to the
-                // ring so every frame only repaints a small area.
+                // Track ring + swipe arc (bounded canvas: cheap frames).
                 RingDial(
                     cxPx = cx,
                     cyPx = cy,
                     ringRPx = ringR,
                     trackPx = trackWidth,
                     activeColor = activePlayer?.let { Color(it.color) },
-                    sweepFraction = if (pending == 0) 0f else (pending.toFloat() / turn.toFloat()).coerceIn(-1f, 1f),
+                    // Arc trails from the player's dot along the drag.
+                    arcStartDeg = activeIndex.takeIf { it >= 0 }
+                        ?.let { (seatAngle(it, n) * 180.0 / PI).toFloat() } ?: -90f,
+                    arcSweepDeg = (accRadians * 180f / PI.toFloat()).coerceIn(-360f, 360f),
                 )
+
+                // Center flash of the last committed delta (iOS "keep last visible").
+                val flash = lastCommit
+                if (activeId == null && flash != null) {
+                    val (colorInt, delta) = flash
+                    Text(
+                        text = if (delta > 0) "+$delta" else "$delta",
+                        fontSize = (scoreSp * 1.1f).sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(colorInt),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
 
                 game.players.forEachIndexed { i, player ->
                     val a = seatAngle(i, n)
@@ -266,21 +281,28 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     )
                 }
 
+                // Scores pushed out to the screen edges along each seat ray.
                 game.players.forEachIndexed { i, player ->
                     val a = seatAngle(i, n)
-                    val lx = clampX(cx + cos(a).toFloat() * labelR)
-                    val ly = clampY(cy + sin(a).toFloat() * labelR)
+                    val dir = Offset(cos(a).toFloat(), sin(a).toFloat())
+                    val maxDist = rayToEdge(center, dir, wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
+                    val dist = min(1.85f * ringR, maxDist)
+                        .coerceAtLeast(ringR + dotD / 2f + with(density) { 8.dp.toPx() })
+                    val lx = cx + dir.x * dist
+                    val ly = cy + dir.y * dist
                     val isActive = activeId == player.id
-                    SeatLabel(
+                    val showingPending = isActive && pending != 0
+                    SeatScore(
                         player = player,
-                        score = game.currentScore(player.id),
+                        // While swiping, the score shows the live pending delta.
+                        text = when {
+                            showingPending && pending > 0 -> "+$pending"
+                            showingPending -> "$pending"
+                            else -> "${game.currentScore(player.id)}"
+                        },
                         scoreSp = scoreSp,
                         boxDp = dp(labelBoxPx),
                         dimmed = activeId != null && !isActive,
-                        pendingDelta = if (isActive) pending else 0,
-                        lastDelta = if (game.keepLastVisible) {
-                            game.entries.lastOrNull { it.playerId == player.id }?.delta
-                        } else null,
                         offsetPx = IntOffset(
                             x = (lx - labelBoxPx / 2f).toInt(),
                             y = (ly - labelBoxPx / 2f).toInt(),
@@ -307,7 +329,8 @@ private fun RingDial(
     ringRPx: Float,
     trackPx: Float,
     activeColor: Color?,
-    sweepFraction: Float,
+    arcStartDeg: Float,
+    arcSweepDeg: Float,
 ) {
     val density = LocalDensity.current
     val diameterPx = ringRPx * 2f + trackPx + with(density) { 4.dp.toPx() }
@@ -328,11 +351,11 @@ private fun RingDial(
             center = center,
             style = Stroke(width = trackPx),
         )
-        if (activeColor != null && sweepFraction != 0f) {
+        if (activeColor != null && arcSweepDeg != 0f) {
             drawArc(
                 color = activeColor,
-                startAngle = -90f,
-                sweepAngle = (sweepFraction * 360f).coerceIn(-360f, 360f),
+                startAngle = arcStartDeg,
+                sweepAngle = arcSweepDeg,
                 useCenter = false,
                 topLeft = Offset(center.x - ringRPx, center.y - ringRPx),
                 size = Size(ringRPx * 2f, ringRPx * 2f),
@@ -367,24 +390,22 @@ private fun SeatDot(
 }
 
 /**
- * Score label outside the ring. Square box (rotation-proof bounds) holding
- * name + score; tap rotates it 90°. Split out so only the active player's
- * label recomposes while a swipe is in progress.
+ * Score label near the screen edge. Square box (rotation-proof bounds);
+ * tap rotates it 90° to face its player. Split out so only the active
+ * player's label recomposes while a swipe is in progress.
  */
 @Composable
-private fun SeatLabel(
+private fun SeatScore(
     player: Player,
-    score: Int,
+    text: String,
     scoreSp: Float,
     boxDp: Dp,
     dimmed: Boolean,
-    pendingDelta: Int,
-    lastDelta: Int?,
     offsetPx: IntOffset,
     onTap: () -> Unit,
 ) {
     val color = Color(player.color)
-    val digits = abs(score).toString().length
+    val digits = text.filter { it.isDigit() }.length
     val size = (scoreSp - (digits - 1).coerceAtLeast(0) * 2.5f).coerceAtLeast(14f)
     Box(
         modifier = Modifier
@@ -399,36 +420,13 @@ private fun SeatLabel(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = player.name,
-                fontSize = (size * 0.26f).coerceAtLeast(10f).sp,
-                color = color,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = "$score",
-                fontSize = size.sp,
-                fontWeight = FontWeight.Bold,
-                color = color,
-                maxLines = 1,
-                textAlign = TextAlign.Center,
-            )
-            when {
-                pendingDelta != 0 -> Text(
-                    text = if (pendingDelta > 0) "+$pendingDelta" else "$pendingDelta",
-                    fontSize = (size * 0.42f).coerceAtLeast(12f).sp,
-                    fontWeight = FontWeight.Bold,
-                    color = color,
-                )
-                lastDelta != null -> Text(
-                    text = if (lastDelta >= 0) "last +$lastDelta" else "last $lastDelta",
-                    fontSize = (size * 0.24f).coerceAtLeast(9f).sp,
-                    color = Color.White.copy(alpha = 0.45f),
-                )
-            }
-        }
+        Text(
+            text = text,
+            fontSize = size.sp,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            maxLines = 1,
+            textAlign = TextAlign.Center,
+        )
     }
 }
