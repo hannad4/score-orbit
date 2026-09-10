@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Simple Scoring</string>
+    <string name="new_game_label">New Game</string>
+    <string name="game_name">Game Name</string>
+    <string name="game_name_hint">e.g. Scrabble, Dominion, D&amp;D Session</string>
+    <string name="players">Players</string>
+    <string name="step">Step</string>
+    <string name="start_game">Start Game</string>
+    <string name="add_player">Add Player</string>
+    <string name="remove_player">Remove</string>
+    <string name="undo">Undo</string>
+    <string name="finish">Finish</string>
+    <string name="winner">Winner</string>
+    <string name="game_history">Game History</string>
+    <string name="no_games">No saved games yet</string>
+    <string name="tap_to_score">Tap a player to add %d points</string>
+    <string name="long_press_to_edit">Long-press to edit score</string>
+    <string name="tap_score_to_rotate">Tap score to rotate</string>
+    <string name="undo_last_move">Undo last move</string>
+    <string name="set_all_same">Set all scores same way</string>
+    <string name="resume">Resume</string>
+    <string name="new_game_title">New Game</string>
+    <string name="player_count">%d Players</string>
+    <string name="undo_empty">Nothing to undo</string>
+    <string name="edit_step_title">Edit Step</string>
+    <string name="step_value">Step: %d</string>
+    <string name="elapsed_time">Elapsed: %s</string>
+    <string name="player_name">Player Name</string>
+    <string name="remove_confirm">Remove this player?</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="empty_history">No games saved yet</string>
+    <string name="history_empty_message">Finish a game to save it here.</string>
+    <string name="sfmt_minsec">%02d:%02d</string>
+    <string name="fmt_minsec">%02d:%02d</string>
+    <string name="fmt_hmsec">%d:%02d:%02d</string>
+</resources>

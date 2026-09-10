@@ -1,0 +1,34 @@
+# Built files
+app/build/
+build/
+
+# Gradle
+.gradle/
+local.properties
+gradle-user-home/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keystore (never commit)
+*.jks
+*.key
+*.keystore
+
+# Debug
+*.log
+
+# Android SDK (huge, not source)
+android-sdk/
+cmdline-tools/
+cmdline-tools.zip
+bin/
+lib/
+init.d/
+gradle/
