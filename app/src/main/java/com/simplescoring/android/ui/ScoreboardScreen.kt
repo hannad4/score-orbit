@@ -34,7 +34,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -47,8 +49,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.draw.rotate
 import com.simplescoring.android.model.Game
+import com.simplescoring.android.model.Player
 import com.simplescoring.android.util.RotationUtils
 import com.simplescoring.android.viewmodel.AppScreen
 import com.simplescoring.android.viewmodel.ScoreViewModel
@@ -92,6 +94,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     var pending by remember(game.id) { mutableIntStateOf(0) }
     var accRadians by remember(game.id) { mutableFloatStateOf(0f) }
     var lastAngle by remember { mutableFloatStateOf(Float.NaN) }
+    var dragBase by remember { mutableIntStateOf(0) }
 
     val turn = turnValue(game.step)
     val activePlayer = game.players.firstOrNull { it.id == activeId }
@@ -141,27 +144,45 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             val density = LocalDensity.current
             val wPx = with(density) { maxWidth.toPx() }
             val hPx = with(density) { maxHeight.toPx() }
+            if (min(wPx, hPx) <= 0f || game.players.isEmpty()) return@BoxWithConstraints
+
             val cx = wPx / 2f
             val cy = hPx / 2f
-            val n = game.players.size.coerceAtLeast(1)
-            val ringR = min(wPx, hPx) * 0.335f
-            val share = (2 * PI.toFloat() * ringR / n) * 0.70f
-            val dotD = share.coerceIn(
-                with(density) { 40.dp.toPx() },
-                with(density) { 84.dp.toPx() },
-            )
-            val trackWidth = dotD * 1.18f
-            val labelGap = with(density) { 30.dp.toPx() }
-            val labelR = ringR + dotD / 2f + labelGap
-            val labelW = with(density) { 120.dp.toPx() }
+            val n = game.players.size
+            val minDim = min(wPx, hPx)
+            fun dp(px: Float): Dp = with(density) { px.toDp() }
 
-            val scoreSp = when {
-                n <= 2 -> 68f
-                n <= 4 -> 58f
-                n <= 6 -> 46f
-                n <= 9 -> 38f
-                else -> 32f
+            // --- Fit the ring + dots + labels inside the screen. ---
+            // Labels live in rotation-proof square boxes so sideways seats
+            // need no more room than upright ones.
+            val labelBoxPx = when {
+                n <= 4 -> with(density) { 104.dp.toPx() }
+                n <= 6 -> with(density) { 88.dp.toPx() }
+                n <= 9 -> with(density) { 72.dp.toPx() }
+                else -> with(density) { 60.dp.toPx() }
             }
+            val gapPx = with(density) { 12.dp.toPx() }
+            val marginPx = with(density) { 6.dp.toPx() }
+            var ringR = minDim * 0.30f
+            var dotD = with(density) { 56.dp.toPx() }
+            repeat(3) {
+                val share = (2 * PI.toFloat() * ringR / n) * 0.68f
+                dotD = share.coerceIn(
+                    with(density) { 32.dp.toPx() },
+                    with(density) { 64.dp.toPx() },
+                )
+                val need = ringR + dotD / 2f + gapPx + labelBoxPx / 2f + marginPx
+                val avail = minDim / 2f
+                if (need > avail) ringR -= (need - avail)
+            }
+            ringR = ringR.coerceAtLeast(with(density) { 40.dp.toPx() })
+            val trackWidth = dotD * 1.12f
+            val labelR = ringR + dotD / 2f + gapPx
+            val scoreSp = (labelBoxPx * 0.42f / density.density).coerceIn(18f, 60f)
+
+            // Clamp helper so labels can never leave the screen.
+            fun clampX(x: Float) = x.coerceIn(labelBoxPx / 2f + 2f, wPx - labelBoxPx / 2f - 2f)
+            fun clampY(y: Float) = y.coerceIn(labelBoxPx / 2f + 2f, hPx - labelBoxPx / 2f - 2f)
 
             Box(
                 modifier = Modifier
@@ -171,14 +192,14 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             onDragStart = { offset ->
                                 val g = latestGame
                                 if (g.players.isEmpty()) return@detectDragGestures
-                                val center = Offset(cx, cy)
-                                val seat = nearestSeat(offset, center, g.players.size)
-                                activeId = g.players[seat].id
-                                val a = atan2(
+                                val seat = nearestSeat(offset, Offset(cx, cy), g.players.size)
+                                val id = g.players[seat].id
+                                activeId = id
+                                dragBase = g.currentScore(id)
+                                lastAngle = atan2(
                                     (offset.y - cy).toDouble(),
                                     (offset.x - cx).toDouble()
                                 ).toFloat()
-                                lastAngle = a
                                 accRadians = 0f
                                 pending = 0
                             },
@@ -187,7 +208,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             onDrag = { change, _ ->
                                 change.consume()
                                 val g = latestGame
-                                val id = activeId ?: return@detectDragGestures
+                                if (activeId == null) return@detectDragGestures
                                 if (lastAngle.isNaN()) {
                                     lastAngle = atan2(
                                         (change.position.y - cy).toDouble(),
@@ -210,7 +231,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 accRadians += delta
                                 var p = (accRadians / (2f * PI.toFloat()) * turn).roundToInt()
                                 if (!g.allowNegative) {
-                                    p = p.coerceAtLeast(-g.currentScore(id))
+                                    p = p.coerceAtLeast(-dragBase)
                                 }
                                 if (p != pending) {
                                     pending = p
@@ -220,126 +241,196 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         )
                     }
             ) {
-                // Track ring + active progress arc.
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawCircle(
-                        color = Color(0xFF262626),
-                        radius = ringR,
-                        center = Offset(cx, cy),
-                        style = Stroke(width = trackWidth),
-                    )
-                    val ap = activePlayer
-                    if (ap != null && pending != 0) {
-                        val sweep = (pending.toFloat() / turn.toFloat() * 360f)
-                            .coerceIn(-360f, 360f)
-                        drawArc(
-                            color = Color(ap.color),
-                            startAngle = -90f,
-                            sweepAngle = sweep,
-                            useCenter = false,
-                            style = Stroke(width = trackWidth),
-                        )
-                    }
-                }
+                // Track ring + progress arc, drawn on a canvas bounded to the
+                // ring so every frame only repaints a small area.
+                RingDial(
+                    cxPx = cx,
+                    cyPx = cy,
+                    ringRPx = ringR,
+                    trackPx = trackWidth,
+                    activeColor = activePlayer?.let { Color(it.color) },
+                    sweepFraction = if (pending == 0) 0f else (pending.toFloat() / turn.toFloat()).coerceIn(-1f, 1f),
+                )
 
-                // Player dots on the ring.
-                val dotSizeDp: Dp = with(density) { dotD.toDp() }
-                val labelWidthDp: Dp = with(density) { labelW.toDp() }
                 game.players.forEachIndexed { i, player ->
                     val a = seatAngle(i, n)
-                    val dotCx = cx + cos(a).toFloat() * ringR
-                    val dotCy = cy + sin(a).toFloat() * ringR
-                    val dim = activeId != null && activeId != player.id
-                    Box(
-                        modifier = Modifier
-                            .offset {
-                                IntOffset(
-                                    x = (dotCx - dotD / 2f).toInt(),
-                                    y = (dotCy - dotD / 2f).toInt(),
-                                )
-                            }
-                            .size(dotSizeDp)
-                            .alpha(if (dim) 0.35f else 1f)
-                            .clip(CircleShape)
-                            .background(Color(player.color))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = {
-                                    buzz(ctx, 12)
-                                    viewModel.addScore(player.id, game.step)
-                                },
-                            )
+                    SeatDot(
+                        color = Color(player.color),
+                        sizeDp = dp(dotD),
+                        dimmed = activeId != null && activeId != player.id,
+                        offsetPx = IntOffset(
+                            x = (cx + cos(a).toFloat() * ringR - dotD / 2f).toInt(),
+                            y = (cy + sin(a).toFloat() * ringR - dotD / 2f).toInt(),
+                        ),
+                        onTap = {
+                            buzz(ctx, 12)
+                            viewModel.addScore(player.id, game.step)
+                        },
                     )
                 }
 
-                // Score labels outside the ring, rotated to face their player.
-                // Tap a score to rotate it 90° (iOS behavior).
                 game.players.forEachIndexed { i, player ->
                     val a = seatAngle(i, n)
-                    val lx = cx + cos(a).toFloat() * labelR
-                    val ly = cy + sin(a).toFloat() * labelR
-                    val score = game.currentScore(player.id)
-                    val dim = activeId != null && activeId != player.id
-                    val isActive = activeId == player.id && pending != 0
-                    val lastDelta = game.entries.lastOrNull { it.playerId == player.id }?.delta
-                    val digits = abs(score).toString().length
-                    val size = (scoreSp - (digits - 1).coerceAtLeast(0) * 5f).coerceAtLeast(20f)
-
-                    Box(
-                        modifier = Modifier
-                            .offset {
-                                IntOffset(
-                                    x = (lx - labelW / 2f).toInt(),
-                                    y = (ly - with(density) { 52.dp.toPx() }).toInt(),
-                                )
-                            }
-                            .width(labelWidthDp)
-                            .alpha(if (dim) 0.4f else 1f)
-                            .rotate(RotationUtils.degrees(player.rotation))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = {
-                                    buzz(ctx, 10)
-                                    viewModel.rotatePlayer(player.id)
-                                },
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = player.name,
-                                fontSize = 13.sp,
-                                color = Color(player.color),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = TextAlign.Center,
-                            )
-                            Text(
-                                text = "$score",
-                                fontSize = size.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(player.color),
-                                maxLines = 1,
-                                textAlign = TextAlign.Center,
-                            )
-                            when {
-                                isActive -> Text(
-                                    text = if (pending > 0) "+$pending" else "$pending",
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(player.color),
-                                )
-                                game.keepLastVisible && lastDelta != null -> Text(
-                                    text = if (lastDelta >= 0) "last +$lastDelta" else "last $lastDelta",
-                                    fontSize = 11.sp,
-                                    color = Color.White.copy(alpha = 0.45f),
-                                )
-                            }
-                        }
-                    }
+                    val lx = clampX(cx + cos(a).toFloat() * labelR)
+                    val ly = clampY(cy + sin(a).toFloat() * labelR)
+                    val isActive = activeId == player.id
+                    SeatLabel(
+                        player = player,
+                        score = game.currentScore(player.id),
+                        scoreSp = scoreSp,
+                        boxDp = dp(labelBoxPx),
+                        dimmed = activeId != null && !isActive,
+                        pendingDelta = if (isActive) pending else 0,
+                        lastDelta = if (game.keepLastVisible) {
+                            game.entries.lastOrNull { it.playerId == player.id }?.delta
+                        } else null,
+                        offsetPx = IntOffset(
+                            x = (lx - labelBoxPx / 2f).toInt(),
+                            y = (ly - labelBoxPx / 2f).toInt(),
+                        ),
+                        onTap = {
+                            buzz(ctx, 10)
+                            viewModel.rotatePlayer(player.id)
+                        },
+                    )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Track ring with the in-progress swipe arc. Bounded to the ring diameter so
+ * drag frames repaint a small canvas instead of the whole screen.
+ */
+@Composable
+private fun RingDial(
+    cxPx: Float,
+    cyPx: Float,
+    ringRPx: Float,
+    trackPx: Float,
+    activeColor: Color?,
+    sweepFraction: Float,
+) {
+    val density = LocalDensity.current
+    val diameterPx = ringRPx * 2f + trackPx + with(density) { 4.dp.toPx() }
+    Canvas(
+        modifier = Modifier
+            .offset {
+                IntOffset(
+                    x = (cxPx - diameterPx / 2f).toInt(),
+                    y = (cyPx - diameterPx / 2f).toInt(),
+                )
+            }
+            .size(with(density) { diameterPx.toDp() })
+    ) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        drawCircle(
+            color = Color(0xFF262626),
+            radius = ringRPx,
+            center = center,
+            style = Stroke(width = trackPx),
+        )
+        if (activeColor != null && sweepFraction != 0f) {
+            drawArc(
+                color = activeColor,
+                startAngle = -90f,
+                sweepAngle = (sweepFraction * 360f).coerceIn(-360f, 360f),
+                useCenter = false,
+                topLeft = Offset(center.x - ringRPx, center.y - ringRPx),
+                size = Size(ringRPx * 2f, ringRPx * 2f),
+                style = Stroke(width = trackPx),
+            )
+        }
+    }
+}
+
+/** One player dot on the ring. Split out so untouched dots skip recomposition. */
+@Composable
+private fun SeatDot(
+    color: Color,
+    sizeDp: Dp,
+    dimmed: Boolean,
+    offsetPx: IntOffset,
+    onTap: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .offset { offsetPx }
+            .size(sizeDp)
+            .alpha(if (dimmed) 0.35f else 1f)
+            .clip(CircleShape)
+            .background(color)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onTap,
+            )
+    )
+}
+
+/**
+ * Score label outside the ring. Square box (rotation-proof bounds) holding
+ * name + score; tap rotates it 90°. Split out so only the active player's
+ * label recomposes while a swipe is in progress.
+ */
+@Composable
+private fun SeatLabel(
+    player: Player,
+    score: Int,
+    scoreSp: Float,
+    boxDp: Dp,
+    dimmed: Boolean,
+    pendingDelta: Int,
+    lastDelta: Int?,
+    offsetPx: IntOffset,
+    onTap: () -> Unit,
+) {
+    val color = Color(player.color)
+    val digits = abs(score).toString().length
+    val size = (scoreSp - (digits - 1).coerceAtLeast(0) * 2.5f).coerceAtLeast(14f)
+    Box(
+        modifier = Modifier
+            .offset { offsetPx }
+            .size(boxDp)
+            .alpha(if (dimmed) 0.4f else 1f)
+            .rotate(RotationUtils.degrees(player.rotation))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onTap,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = player.name,
+                fontSize = (size * 0.26f).coerceAtLeast(10f).sp,
+                color = color,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = "$score",
+                fontSize = size.sp,
+                fontWeight = FontWeight.Bold,
+                color = color,
+                maxLines = 1,
+                textAlign = TextAlign.Center,
+            )
+            when {
+                pendingDelta != 0 -> Text(
+                    text = if (pendingDelta > 0) "+$pendingDelta" else "$pendingDelta",
+                    fontSize = (size * 0.42f).coerceAtLeast(12f).sp,
+                    fontWeight = FontWeight.Bold,
+                    color = color,
+                )
+                lastDelta != null -> Text(
+                    text = if (lastDelta >= 0) "last +$lastDelta" else "last $lastDelta",
+                    fontSize = (size * 0.24f).coerceAtLeast(9f).sp,
+                    color = Color.White.copy(alpha = 0.45f),
+                )
             }
         }
     }
