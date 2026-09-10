@@ -30,6 +30,8 @@ data class Game(
     val players: List<Player> = emptyList(),
     val step: Int = 1,
     val winMetric: WinMetric = WinMetric.HIGHEST,
+    val allowNegative: Boolean = false,
+    val keepLastVisible: Boolean = true,
     val entries: List<ScoreEntry> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
     val finishedAt: Long? = null,

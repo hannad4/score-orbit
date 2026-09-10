@@ -75,6 +75,8 @@ object GameRepository {
         put("winnerId", game.winnerId ?: JSONObject.NULL)
         put("step", game.step)
         put("winMetric", game.winMetric.ordinal)
+        put("allowNegative", game.allowNegative)
+        put("keepLastVisible", game.keepLastVisible)
         put("players", JSONArray().also { arr ->
             game.players.forEach { arr.put(playerToJson(it)) }
         })
@@ -128,6 +130,8 @@ object GameRepository {
             winnerId = if (obj.isNull("winnerId")) null else obj.getString("winnerId"),
             step = obj.optInt("step", 1).coerceAtLeast(1),
             winMetric = WinMetric.entries.getOrElse(obj.optInt("winMetric", 0)) { WinMetric.HIGHEST },
+            allowNegative = obj.optBoolean("allowNegative", false),
+            keepLastVisible = obj.optBoolean("keepLastVisible", true),
             players = players,
             entries = entries
         )
