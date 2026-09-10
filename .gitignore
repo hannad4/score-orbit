@@ -31,4 +31,11 @@ cmdline-tools.zip
 bin/
 lib/
 init.d/
-gradle/
+
+# Local Gradle distribution leftovers (not source, keep gradle/wrapper/ tracked)
+orig_gradle_backup/
+N
+gradle/LICENSE
+gradle/NOTICE
+gradle/README
+gradle/wrapper/gradle-wrapper-shared-*.jar
