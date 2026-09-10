@@ -1,59 +1,103 @@
 package com.simplescoring.android.ui
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.Animatable
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Undo
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.SpringSpec
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.border
-import android.content.Context
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
 import com.simplescoring.android.model.Game
 import com.simplescoring.android.model.Player
-import com.simplescoring.android.viewmodel.ScoreViewModel
+import com.simplescoring.android.model.WinMetric
 import com.simplescoring.android.ui.theme.ScoreAnythingColors
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.atan2
+import com.simplescoring.android.util.RotationUtils
+import com.simplescoring.android.viewmodel.ScoreViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.sin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,44 +108,30 @@ fun ScoreAnythingApp(viewModel: ScoreViewModel) {
 
     Scaffold(
         containerColor = ScoreAnythingColors.BackgroundDark,
-        topBar = {
-            TopAppBar(
-                title = { Text("Score Anything") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = ScoreAnythingColors.BackgroundDark,
-                    titleContentColor = ScoreAnythingColors.OnBackground
-                ),
-                actions = {
-                    IconButton(onClick = { viewModel.showHistoryScreen() }) {
-                        Icon(Icons.Default.Share, contentDescription = "History", tint = ScoreAnythingColors.OnBackground)
-                    }
-                }
-            )
-        }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             when {
-                currentGame == null && !showHistory -> {
-                    NewGameScreen(
-                        onStart = { playerCount, names, colors, step, timerSeconds ->
-                            viewModel.startNewGame(playerCount, names, colors, step, timerSeconds)
-                        },
-                        onViewHistory = { viewModel.showHistoryScreen() }
-                    )
-                }
                 showHistory -> {
                     GameHistoryScreen(
                         history = history,
-                        onDismiss = { viewModel.dismissHistory() }
+                        onNewGame = { viewModel.dismissHistory() },
+                        onResume = { viewModel.resumeGame(it) },
+                        onDelete = { viewModel.deleteGame(it) },
+                        onClearAll = { viewModel.clearHistory() },
+                    )
+                }
+                currentGame == null -> {
+                    SetupScreen(
+                        onStart = { count, names, colors, step, boardName, metric ->
+                            viewModel.startNewGame(count, names, colors, step, 0, boardName, metric)
+                        },
+                        onViewHistory = { viewModel.showHistoryScreen() },
+                        historyEmpty = history.isEmpty(),
                     )
                 }
                 else -> {
                     currentGame?.let { game ->
-                        GameBoardScreen(
-                            game = game,
-                            viewModel = viewModel,
-                            onBack = { viewModel.showHistoryScreen() }
-                        )
+                        BoardScreen(game = game, viewModel = viewModel)
                     }
                 }
             }
@@ -109,31 +139,43 @@ fun ScoreAnythingApp(viewModel: ScoreViewModel) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Setup
+// ---------------------------------------------------------------------------
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewGameScreen(
-    onStart: (Int, List<String>, List<Int>, Int, Int) -> Unit,
-    onViewHistory: () -> Unit
+fun SetupScreen(
+    onStart: (Int, List<String>, List<Int>, Int, String, WinMetric) -> Unit,
+    onViewHistory: () -> Unit,
+    historyEmpty: Boolean,
 ) {
-    val ctx = LocalContext.current
-    val vibrator = remember { ctx.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator }
+    var boardName by remember { mutableStateOf("") }
     var playerCount by remember { mutableIntStateOf(2) }
-    var names by remember { mutableStateOf("Player 1, Player 2") }
-    var globalStep by remember { mutableIntStateOf(5) }
-    var timerSeconds by remember { mutableIntStateOf(0) }
+    var step by remember { mutableIntStateOf(1) }
+    var winMetric by remember { mutableStateOf(WinMetric.HIGHEST) }
+    val names = remember {
+        mutableStateListOf<String>().apply { repeat(12) { add("Player ${it + 1}") } }
+    }
+    val colors = remember {
+        mutableStateListOf<Int>().apply {
+            addAll(List(12) { i -> ScoreAnythingColors.PlayerColors[i % ScoreAnythingColors.PlayerColors.size] })
+        }
+    }
 
     Scaffold(
         containerColor = ScoreAnythingColors.BackgroundDark,
         topBar = {
             TopAppBar(
-                title = { Text("New Game") },
+                title = { Text("New Scoreboard") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = ScoreAnythingColors.BackgroundDark,
-                    titleContentColor = ScoreAnythingColors.OnBackground
+                    titleContentColor = ScoreAnythingColors.OnBackground,
+                    actionIconContentColor = ScoreAnythingColors.OnBackground,
                 ),
-                navigationIcon = {
+                actions = {
                     IconButton(onClick = onViewHistory) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = ScoreAnythingColors.OnBackground)
+                        Icon(Icons.Default.History, contentDescription = "Scoreboards")
                     }
                 }
             )
@@ -145,140 +187,235 @@ fun NewGameScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(
-                text = "Set Up Your Game",
-                style = MaterialTheme.typography.headlineSmall,
-                color = ScoreAnythingColors.OnBackground,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-
-            Text("Number of Players", style = MaterialTheme.typography.labelLarge, color = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                repeat(12) { i ->
-                    FilterChip(
-                        selected = playerCount == i + 1,
-                        onClick = { playerCount = i + 1 },
-                        label = { Text((i + 1).toString()) },
-                        modifier = Modifier.weight(1f),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = ScoreAnythingColors.Accent,
-                            selectedLabelColor = ScoreAnythingColors.OnBackground
-                        )
-                    )
-                }
-            }
-
-            Text("Player Colors — drag the colored circle like a rotary dial", style = MaterialTheme.typography.labelLarge, color = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            ) {
-                repeat(playerCount.coerceAtMost(6)) { i ->
-                    val color = ScoreAnythingColors.PlayerColors.getOrElse(i) { 0xFF5B9BD5.toInt() }
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Color(color))
-                            .border(2.dp, ScoreAnythingColors.OnSurface.copy(alpha = 0.3f), CircleShape)
-                    )
-                }
-            }
-
-            if (playerCount > 6) {
-                Text(
-                    "Showing first 6 color chips. Remaining players get auto-assigned colors.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f)
-                )
-            }
-
             OutlinedTextField(
-                value = names,
-                onValueChange = { names = it },
-                label = { Text("Player Names (comma-separated)") },
-                placeholder = { Text("e.g. Alice, Bob, Charlie") },
-                singleLine = true,
-                supportingText = {
-                    val parsed = names.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                    Text("${parsed.size} of $playerCount names entered")
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = ScoreAnythingColors.SurfaceDark,
-                    unfocusedContainerColor = ScoreAnythingColors.SurfaceDark,
-                    focusedBorderColor = ScoreAnythingColors.Accent,
-                    unfocusedBorderColor = ScoreAnythingColors.OnSurface.copy(alpha = 0.3f),
-                    focusedLabelColor = ScoreAnythingColors.Accent,
-                    unfocusedLabelColor = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f),
-                    cursorColor = ScoreAnythingColors.Accent
-                )
-            )
-
-            OutlinedTextField(
-                value = globalStep.toString(),
-                onValueChange = { globalStep = it.toIntOrNull()?.coerceAtLeast(1) ?: 1 },
-                label = { Text("Points per full rotation") },
-                placeholder = { Text("e.g. 5") },
+                value = boardName,
+                onValueChange = { boardName = it },
+                label = { Text("Scoreboard name") },
+                placeholder = { Text("e.g. Catan night") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = ScoreAnythingColors.SurfaceDark,
-                    unfocusedContainerColor = ScoreAnythingColors.SurfaceDark,
-                    focusedBorderColor = ScoreAnythingColors.Accent,
-                    unfocusedBorderColor = ScoreAnythingColors.OnSurface.copy(alpha = 0.3f),
-                    focusedLabelColor = ScoreAnythingColors.Accent,
-                    unfocusedLabelColor = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f),
-                    cursorColor = ScoreAnythingColors.Accent
-                )
+                colors = setupFieldColors(),
             )
 
-            Text("Timer (seconds, 0 = off)", style = MaterialTheme.typography.labelLarge, color = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f))
-            Slider(
-                value = timerSeconds.toFloat(),
-                onValueChange = { timerSeconds = it.toInt() },
-                valueRange = 0f..3600f,
-                steps = if (timerSeconds > 0) 3599 else 0,
-                modifier = Modifier.fillMaxWidth()
-            )
+            // Player count stepper (1..12)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Off", style = MaterialTheme.typography.bodySmall, color = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f))
-                Spacer(modifier = Modifier.weight(1f))
-                Text("${timerSeconds}s", style = MaterialTheme.typography.bodyMedium, color = ScoreAnythingColors.OnBackground, fontWeight = FontWeight.Medium)
+                Text(
+                    "Players",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f),
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(
+                    onClick = { playerCount = (playerCount - 1).coerceAtLeast(1) },
+                    enabled = playerCount > 1,
+                ) {
+                    Icon(Icons.Default.Remove, contentDescription = "Fewer players")
+                }
+                Text(
+                    "$playerCount",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = ScoreAnythingColors.OnBackground,
+                    modifier = Modifier.width(32.dp),
+                    textAlign = TextAlign.Center,
+                )
+                IconButton(
+                    onClick = { playerCount = (playerCount + 1).coerceAtMost(12) },
+                    enabled = playerCount < 12,
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "More players")
+                }
+            }
+
+            // Per-player name + color rows
+            repeat(playerCount) { i ->
+                PlayerSetupRow(
+                    index = i,
+                    name = names[i],
+                    color = colors[i],
+                    usedColors = colors.take(playerCount),
+                    onNameChange = { names[i] = it },
+                    onColorChange = { colors[i] = it },
+                )
+            }
+
+            // Points per step stepper
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Points per tap",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f),
+                    )
+                    Text(
+                        "One full dial turn scores this much",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ScoreAnythingColors.OnSurface.copy(alpha = 0.5f),
+                    )
+                }
+                IconButton(
+                    onClick = { step = (step - 1).coerceAtLeast(1) },
+                    enabled = step > 1,
+                ) {
+                    Icon(Icons.Default.Remove, contentDescription = "Decrease step")
+                }
+                Text(
+                    "$step",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = ScoreAnythingColors.OnBackground,
+                    modifier = Modifier.width(48.dp),
+                    textAlign = TextAlign.Center,
+                )
+                IconButton(onClick = { step = (step + 1).coerceAtMost(100) }) {
+                    Icon(Icons.Default.Add, contentDescription = "Increase step")
+                }
+            }
+
+            // Win metric
+            Text(
+                "Winner",
+                style = MaterialTheme.typography.labelLarge,
+                color = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = winMetric == WinMetric.HIGHEST,
+                    onClick = { winMetric = WinMetric.HIGHEST },
+                    label = { Text("Highest wins") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = ScoreAnythingColors.Accent,
+                        selectedLabelColor = ScoreAnythingColors.OnBackground,
+                    )
+                )
+                FilterChip(
+                    selected = winMetric == WinMetric.LOWEST,
+                    onClick = { winMetric = WinMetric.LOWEST },
+                    label = { Text("Lowest wins") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = ScoreAnythingColors.Accent,
+                        selectedLabelColor = ScoreAnythingColors.OnBackground,
+                    )
+                )
             }
 
             Button(
                 onClick = {
-                    val parsedNames = names.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                    if (parsedNames.size != playerCount) return@Button
-                    onStart(playerCount, parsedNames, ScoreAnythingColors.PlayerColors.take(playerCount).toList(), globalStep, timerSeconds)
+                    onStart(
+                        playerCount,
+                        List(playerCount) { i -> names[i].ifBlank { "Player ${i + 1}" } },
+                        List(playerCount) { i -> colors[i] },
+                        step,
+                        boardName.ifBlank { defaultBoardName() },
+                        winMetric,
+                    )
                 },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = ScoreAnythingColors.Accent)
             ) {
-                Text("Start Game", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Start Scoring", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
 
-            OutlinedButton(onClick = onViewHistory, modifier = Modifier.fillMaxWidth()) {
-                Text("View Game History")
+            if (!historyEmpty) {
+                OutlinedButton(onClick = onViewHistory, modifier = Modifier.fillMaxWidth()) {
+                    Text("Saved Scoreboards")
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun setupFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = ScoreAnythingColors.OnBackground,
+    unfocusedTextColor = ScoreAnythingColors.OnBackground,
+    focusedContainerColor = ScoreAnythingColors.SurfaceDark,
+    unfocusedContainerColor = ScoreAnythingColors.SurfaceDark,
+    focusedBorderColor = ScoreAnythingColors.Accent,
+    unfocusedBorderColor = ScoreAnythingColors.OnSurface.copy(alpha = 0.3f),
+    focusedLabelColor = ScoreAnythingColors.Accent,
+    unfocusedLabelColor = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f),
+    cursorColor = ScoreAnythingColors.Accent,
+)
+
+@Composable
+fun PlayerSetupRow(
+    index: Int,
+    name: String,
+    color: Int,
+    usedColors: List<Int>,
+    onNameChange: (String) -> Unit,
+    onColorChange: (Int) -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = ScoreAnythingColors.SurfaceDark),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = onNameChange,
+                label = { Text("Player ${index + 1}") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                colors = setupFieldColors(),
+            )
+            // 24-color palette in rows of 8; a dot warns if the color is taken twice.
+            ScoreAnythingColors.PlayerColors.chunked(8).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { c ->
+                        val selected = c == color
+                        val duplicated = usedColors.count { it == c } > 1 && selected
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Color(c))
+                                .border(
+                                    width = if (selected) 3.dp else 1.dp,
+                                    color = when {
+                                        selected -> Color.White
+                                        else -> Color.White.copy(alpha = 0.25f)
+                                    },
+                                    shape = CircleShape,
+                                )
+                                .clickable { onColorChange(c) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (duplicated) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White)
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
+private fun defaultBoardName(): String {
+    val fmt = SimpleDateFormat("MMM d", Locale.getDefault())
+    return "Game · ${fmt.format(Date())}"
+}
+
+// ---------------------------------------------------------------------------
+// Board
+// ---------------------------------------------------------------------------
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GameBoardScreen(
-    game: Game,
-    viewModel: ScoreViewModel,
-    onBack: () -> Unit
-) {
-    val step = game.step
-    val circleSize = if (game.players.size > 6) 72.dp else 96.dp
+fun BoardScreen(game: Game, viewModel: ScoreViewModel) {
+    val canUndo = viewModel.undoStack.isNotEmpty()
+    val winner = game.winner()
+    val columns = if (game.players.size == 1) 1 else 2
 
     Scaffold(
         containerColor = ScoreAnythingColors.BackgroundDark,
@@ -286,235 +423,545 @@ fun GameBoardScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (game.winner() != null) "🏆 ${game.winner()!!.name} WINS!"
-                        else "${game.players.size} Players",
-                        fontWeight = if (game.winner() != null) FontWeight.Bold else FontWeight.Normal,
-                        color = if (game.winner() != null) ScoreAnythingColors.WinnerGold else ScoreAnythingColors.OnBackground
+                        game.name,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = ScoreAnythingColors.OnBackground)
+                    IconButton(onClick = { viewModel.showHistoryScreen() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Scoreboards")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = ScoreAnythingColors.BackgroundDark,
                     titleContentColor = ScoreAnythingColors.OnBackground,
-                    navigationIconContentColor = ScoreAnythingColors.OnBackground
-                )
+                    navigationIconContentColor = ScoreAnythingColors.OnBackground,
+                    actionIconContentColor = ScoreAnythingColors.OnBackground,
+                ),
+                actions = {
+                    IconButton(onClick = { viewModel.undo() }, enabled = canUndo) {
+                        Icon(Icons.Default.Undo, contentDescription = "Undo last score")
+                    }
+                    IconButton(onClick = { viewModel.finishGame() }) {
+                        Icon(Icons.Default.Check, contentDescription = "Finish game")
+                    }
+                }
             )
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        Column(
+            modifier = Modifier.fillMaxSize().padding(paddingValues)
         ) {
-            items(game.players.size) { idx ->
-                val player = game.players[idx]
-                RotaryDialTile(
-                    player = player,
-                    score = game.currentScore(player.id),
-                    step = step,
-                    isWinner = game.winner()?.id == player.id,
-                    circleSize = circleSize,
-                    onScoreAdd = { points -> viewModel.addScore(player.id, points) },
-                    onClear = { viewModel.resetPlayerScore(player.id) }
+            if (winner != null) {
+                WinnerBanner(
+                    winnerName = winner.name,
+                    metric = game.winMetric,
+                    onNewRound = { viewModel.resetAllScores() },
+                    onFinish = { viewModel.finishGame() },
                 )
             }
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { viewModel.resetAllScores() },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ScoreAnythingColors.UndoDisabled)
-                ) {
-                    Text("Clear All Scores")
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(columns),
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(game.players, key = { it.id }) { player ->
+                    PlayerDialTile(
+                        player = player,
+                        score = game.currentScore(player.id),
+                        lastDelta = game.entries.lastOrNull { it.playerId == player.id }?.delta,
+                        step = game.step,
+                        isWinner = winner?.id == player.id,
+                        onScore = { viewModel.addScore(player.id, it) },
+                        onRotate = { viewModel.rotatePlayer(player.id) },
+                        onReset = { viewModel.resetPlayerScore(player.id) },
+                    )
                 }
+            }
+            ScoreStrip(
+                game = game,
+                canUndo = canUndo,
+                onUndo = { viewModel.undo() },
+                onClearAll = { viewModel.resetAllScores() },
+            )
+        }
+    }
+}
+
+@Composable
+fun WinnerBanner(
+    winnerName: String,
+    metric: WinMetric,
+    onNewRound: () -> Unit,
+    onFinish: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = ScoreAnythingColors.WinnerGold.copy(alpha = 0.15f)
+        ),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "\uD83C\uDFC6 $winnerName ${if (metric == WinMetric.HIGHEST) "leads" else "leads (low)"}!",
+                color = ScoreAnythingColors.WinnerGold,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            TextButton(onClick = onNewRound) { Text("New round", color = ScoreAnythingColors.WinnerGold) }
+            TextButton(onClick = onFinish) { Text("Finish", color = ScoreAnythingColors.WinnerGold) }
+        }
+    }
+}
+
+/**
+ * Rotary-dial scoring tile.
+ *
+ * Circular drag around the dial accumulates angle: each full clockwise turn
+ * scores +step, each full counter-clockwise turn scores -step (like a rotary
+ * phone / iPod click wheel). A plain tap scores +step. Haptics tick each
+ * quarter turn and thump on a completed turn.
+ */
+@Composable
+fun PlayerDialTile(
+    player: Player,
+    score: Int,
+    lastDelta: Int?,
+    step: Int,
+    isWinner: Boolean,
+    onScore: (Int) -> Unit,
+    onRotate: () -> Unit,
+    onReset: () -> Unit,
+) {
+    val ctx = LocalContext.current
+    var accumulated by remember(player.id) { mutableFloatStateOf(0f) }
+    var lastAngle by remember(player.id) { mutableFloatStateOf(Float.NaN) }
+    var quarterTicks by remember(player.id) { mutableIntStateOf(0) }
+    var dialPx by remember { mutableFloatStateOf(1f) }
+
+    fun angleOf(position: Offset): Float {
+        val dx = (position.x - dialPx / 2.0).toFloat()
+        val dy = (position.y - dialPx / 2.0).toFloat()
+        return atan2(dy.toDouble(), dx.toDouble()).toFloat()
+    }
+
+    val dialColor = if (isWinner) ScoreAnythingColors.WinnerGold else Color(player.color)
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (isWinner)
+                ScoreAnythingColors.WinnerGold.copy(alpha = 0.12f)
+            else
+                ScoreAnythingColors.SurfaceDark
+        ),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            // Scorekeeper header (always upright): name + rotate + reset.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = player.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isWinner) ScoreAnythingColors.WinnerGold else ScoreAnythingColors.OnBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onRotate, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = "Rotate to face player",
+                        tint = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                IconButton(onClick = onReset, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Reset player score",
+                        tint = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+
+            // Dial with live progress. Tapping scores one step.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.72f)
+                    .aspectRatio(1f)
+                    .onSizeChanged { dialPx = min(it.width, it.height).toFloat().coerceAtLeast(1f) }
+                    .clip(CircleShape)
+                    .background(dialColor)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {
+                            buzz(ctx, 12)
+                            accumulated = 0f
+                            quarterTicks = 0
+                            onScore(step)
+                        },
+                    )
+                    .pointerInput(player.id, step) {
+                        detectDragGestures(
+                            onDragStart = { offset -> lastAngle = angleOf(offset) },
+                            onDragEnd = {
+                                accumulated = 0f
+                                lastAngle = Float.NaN
+                                quarterTicks = 0
+                            },
+                            onDragCancel = {
+                                accumulated = 0f
+                                lastAngle = Float.NaN
+                                quarterTicks = 0
+                            },
+                            onDrag = { change, _ ->
+                                change.consume()
+                                if (lastAngle.isNaN()) {
+                                    lastAngle = angleOf(change.position)
+                                    return@detectDragGestures
+                                }
+                                val angle = angleOf(change.position)
+                                var delta = angle - lastAngle
+                                while (delta > PI.toFloat()) delta -= 2f * PI.toFloat()
+                                while (delta < -PI.toFloat()) delta += 2f * PI.toFloat()
+                                // Finger jumped across the dial: re-anchor instead of
+                                // crediting a huge phantom turn.
+                                if (abs(delta) > PI.toFloat() / 2f) {
+                                    lastAngle = angle
+                                    return@detectDragGestures
+                                }
+                                lastAngle = angle
+                                accumulated += delta
+                                val quarters = (abs(accumulated) / (PI.toFloat() / 2f)).toInt()
+                                if (quarters != quarterTicks) {
+                                    quarterTicks = quarters
+                                    buzz(ctx, 8)
+                                }
+                                val fullTurn = 2f * PI.toFloat()
+                                while (accumulated >= fullTurn) {
+                                    accumulated -= fullTurn
+                                    quarterTicks = 0
+                                    buzz(ctx, 25)
+                                    onScore(step)
+                                }
+                                while (accumulated <= -fullTurn) {
+                                    accumulated += fullTurn
+                                    quarterTicks = 0
+                                    buzz(ctx, 25)
+                                    onScore(-step)
+                                }
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val radius = size.minDimension / 2f
+                    // Tick ring (rotary-phone holes).
+                    repeat(12) { i ->
+                        val a = (i * 30.0 - 90.0) * PI / 180.0
+                        val outer = radius * 0.94f
+                        val inner = radius * 0.80f
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.55f),
+                            start = Offset(
+                                center.x + cos(a).toFloat() * inner,
+                                center.y + sin(a).toFloat() * inner,
+                            ),
+                            end = Offset(
+                                center.x + cos(a).toFloat() * outer,
+                                center.y + sin(a).toFloat() * outer,
+                            ),
+                            strokeWidth = size.minDimension * 0.022f,
+                        )
+                    }
+                    // Progress arc for the in-progress turn.
+                    if (abs(accumulated) > 0.02f) {
+                        drawArc(
+                            color = Color.White,
+                            startAngle = -90f,
+                            sweepAngle = (accumulated * 180f / PI.toFloat()).coerceIn(-360f, 360f),
+                            useCenter = false,
+                            style = Stroke(width = size.minDimension * 0.045f),
+                        )
+                    }
+                    // Knob dot tracking the finger's accumulated angle.
+                    val ka = accumulated - PI.toFloat() / 2f
+                    val kr = radius * 0.62f
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.9f),
+                        radius = size.minDimension * 0.05f,
+                        center = Offset(
+                            center.x + cos(ka) * kr,
+                            center.y + sin(ka) * kr,
+                        ),
+                    )
+                }
+                Text(
+                    text = "+$step",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+            }
+
+            // Score block rotates to face its player (tabletop mode).
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.rotate(RotationUtils.degrees(player.rotation)),
+            ) {
+                Text(
+                    text = "$score",
+                    style = scoreTextStyle(score),
+                    fontWeight = FontWeight.Bold,
+                    color = if (isWinner) ScoreAnythingColors.WinnerGold else ScoreAnythingColors.OnBackground,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                )
+                Text(
+                    text = when {
+                        lastDelta == null -> "drag dial or tap +$step"
+                        lastDelta >= 0 -> "last +$lastDelta"
+                        else -> "last $lastDelta"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ScoreAnythingColors.OnSurface.copy(alpha = 0.55f),
+                    maxLines = 1,
+                )
             }
         }
     }
 }
 
 @Composable
-fun RotaryDialTile(
-    player: Player,
-    score: Int,
-    step: Int,
-    isWinner: Boolean,
-    circleSize: Dp,
-    onScoreAdd: (Int) -> Unit,
-    onClear: () -> Unit
-) {
-    val ctx = LocalContext.current
-    val rot = remember { Animatable(0f) }
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val appliedRotation = remember { mutableStateOf(0f) }
-    val density = LocalDensity.current
+private fun scoreTextStyle(score: Int) = when (abs(score).toString().length) {
+    in 0..3 -> MaterialTheme.typography.displayMedium
+    in 4..5 -> MaterialTheme.typography.displaySmall
+    else -> MaterialTheme.typography.headlineLarge
+}
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (isWinner) ScoreAnythingColors.WinnerGold.copy(alpha = 0.15f) else Color.Transparent)
-            .padding(6.dp)
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            val sizePx = with(density) { (circleSize + 12.dp).toPx() }
-            Box(
-                modifier = Modifier
-                    .size(circleSize + 12.dp)
-                    .clip(CircleShape)
-                    .background(if (isWinner) ScoreAnythingColors.WinnerGold.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.08f))
-            )
-            Box(
-                modifier = Modifier
-                    .size(circleSize)
-                    .offset(y = 6.dp)
-                    .clip(CircleShape)
-                    .background(if (isWinner) ScoreAnythingColors.WinnerGold else Color(player.color))
-                    .rotate(if (isPressed) 10f else 0f)
-                    .pointerInput(player.id) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                val cx = sizePx / 2f
-                                val cy = sizePx / 2f
-                                val dx = offset.x - cx
-                                val dy = offset.y - cy
-                                val angle = kotlin.math.atan2(dy.toDouble(), dx.toDouble()).toFloat()
-                                appliedRotation.value = angle
-                            },
-                            onDrag = { change, _ ->
-                                val cx = sizePx / 2f
-                                val cy = sizePx / 2f
-                                val dx = change.position.x - cx
-                                val dy = change.position.y - cy
-                                val angle = kotlin.math.atan2(dy.toDouble(), dx.toDouble()).toFloat()
-                                val prev = appliedRotation.value
-                                var delta = angle - prev
-                                if (delta > PI.toFloat()) delta -= 2f * PI.toFloat()
-                                else if (delta < -PI.toFloat()) delta += 2f * PI.toFloat()
-                                appliedRotation.value = angle
-                                val degrees = delta * 180f / PI.toFloat()
-                                if (degrees >= 360f) {
-                                    val turns = (degrees / 360f).toInt()
-                                    onScoreAdd(turns * step)
-                                    appliedRotation.value = angle - (turns * 360f).toFloat()
-                                } else if (degrees <= -360f) {
-                                    val turns = (-degrees / 360f).toInt()
-                                    onScoreAdd(-turns * step)
-                                    appliedRotation.value = angle + (turns * 360f).toFloat()
-                                }
-                            },
-                            onDragEnd = {
-                                appliedRotation.value = 0f
-                            },
-                            onDragCancel = {
-                                appliedRotation.value = 0f
-                            }
+@Composable
+fun ScoreStrip(
+    game: Game,
+    canUndo: Boolean,
+    onUndo: () -> Unit,
+    onClearAll: () -> Unit,
+) {
+    val recent = remember(game.entries) { game.entries.takeLast(8).reversed() }
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+        if (recent.isNotEmpty()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                items(recent, key = { it.id }) { entry ->
+                    val player = game.players.firstOrNull { it.id == entry.playerId }
+                    val label = "${player?.name ?: "?"} ${if (entry.delta >= 0) "+" else ""}${entry.delta}"
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ScoreAnythingColors.OnBackground,
+                            maxLines = 1,
                         )
                     }
-                    .pointerInput(player.id) {
-                        detectTapGestures(
-                            onTap = {
-                                vibrate(ctx)
-                                onScoreAdd(step)
-                            }
-                        )
-                    }
-            )
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .clip(CircleShape)
-                    .background(ScoreAnythingColors.OnBackground.copy(alpha = 0.9f))
-                    .offset(y = 10.dp)
-            )
-        }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = circleSize + 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(text = player.name, style = MaterialTheme.typography.titleMedium,
-                color = if (isWinner) ScoreAnythingColors.WinnerGold else ScoreAnythingColors.OnBackground,
-                fontWeight = if (isWinner) FontWeight.Bold else FontWeight.Normal,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(text = "$score", style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
-                color = if (score > 0) ScoreAnythingColors.OnBackground else ScoreAnythingColors.OnSurface.copy(alpha = 0.5f),
-                textAlign = TextAlign.Center)
-            if (!isWinner) {
-                TextButton(
-                    onClick = onClear,
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                    colors = ButtonDefaults.textButtonColors(contentColor = ScoreAnythingColors.UndoDisabled)
-                ) {
-                    Text("Reset Score", style = MaterialTheme.typography.bodySmall)
                 }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = onUndo,
+                enabled = canUndo,
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Default.Undo, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Undo")
+            }
+            OutlinedButton(onClick = onClearAll, modifier = Modifier.weight(1f)) {
+                Text("New round")
             }
         }
     }
 }
 
-private fun vibrate(ctx: Context) {
+fun buzz(ctx: Context, millis: Long) {
     try {
         val v = ctx.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            v.vibrate(VibrationEffect.createOneShot(12, VibrationEffect.DEFAULT_AMPLITUDE))
+            v.vibrate(VibrationEffect.createOneShot(millis, VibrationEffect.DEFAULT_AMPLITUDE))
         } else {
             @Suppress("DEPRECATION")
-            v.vibrate(12)
+            v.vibrate(millis)
         }
     } catch (_: Exception) { }
 }
+
+// ---------------------------------------------------------------------------
+// History
+// ---------------------------------------------------------------------------
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GameHistoryScreen(
     history: List<Game>,
-    onDismiss: () -> Unit
+    onNewGame: () -> Unit,
+    onResume: (Game) -> Unit,
+    onDelete: (Game) -> Unit,
+    onClearAll: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { Text("Game History") },
-            navigationIcon = {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+    Scaffold(
+        containerColor = ScoreAnythingColors.BackgroundDark,
+        topBar = {
+            TopAppBar(
+                title = { Text("Scoreboards") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = ScoreAnythingColors.BackgroundDark,
+                    titleContentColor = ScoreAnythingColors.OnBackground,
+                    actionIconContentColor = ScoreAnythingColors.OnBackground,
+                ),
+                actions = {
+                    if (history.isNotEmpty()) {
+                        TextButton(onClick = onClearAll) {
+                            Text("Clear", color = ScoreAnythingColors.OnBackground)
+                        }
+                    }
                 }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = ScoreAnythingColors.BackgroundDark,
-                titleContentColor = ScoreAnythingColors.OnBackground,
-                navigationIconContentColor = ScoreAnythingColors.OnBackground
             )
-        )
+        }
+    ) { paddingValues ->
         if (history.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No games yet.")
+            Box(
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("No scoreboards yet.", color = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onNewGame,
+                        colors = ButtonDefaults.buttonColors(containerColor = ScoreAnythingColors.Accent),
+                    ) {
+                        Text("Create one")
+                    }
+                }
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                contentPadding = PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(history.size) { idx ->
-                    val game = history[idx]
-                    Text("${game.players.size} players — ${game.winner()?.name ?: "no winner"}", style = MaterialTheme.typography.titleMedium)
-                }
                 item {
-                    OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                        Text("Close")
+                    Button(
+                        onClick = onNewGame,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = ScoreAnythingColors.Accent),
+                    ) {
+                        Text("New Scoreboard")
                     }
                 }
+                items(history, key = { it.id }) { game ->
+                    HistoryCard(game = game, onResume = { onResume(game) }, onDelete = { onDelete(game) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HistoryCard(game: Game, onResume: () -> Unit, onDelete: () -> Unit) {
+    val fmt = remember { SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault()) }
+    val date = remember(game) {
+        fmt.format(Date(game.finishedAt ?: game.createdAt))
+    }
+    val winner = game.winner()
+    Card(
+        colors = CardDefaults.cardColors(containerColor = ScoreAnythingColors.SurfaceDark),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        game.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = ScoreAnythingColors.OnBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        "$date · ${game.players.size} players · step ${game.step}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ScoreAnythingColors.OnSurface.copy(alpha = 0.6f),
+                    )
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete scoreboard",
+                        tint = ScoreAnythingColors.OnSurface.copy(alpha = 0.6f),
+                    )
+                }
+            }
+            game.players.forEach { p ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(Color(p.color))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        p.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ScoreAnythingColors.OnBackground,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        "${game.currentScore(p.id)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = ScoreAnythingColors.OnBackground,
+                    )
+                }
+            }
+            if (winner != null) {
+                Text(
+                    "\uD83C\uDFC6 ${winner.name} wins (${game.currentScore(winner.id)})",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = ScoreAnythingColors.WinnerGold,
+                )
+            }
+            OutlinedButton(onClick = onResume, modifier = Modifier.fillMaxWidth()) {
+                Text("Resume")
             }
         }
     }

@@ -13,6 +13,10 @@ enum class Rotation {
     fun next(): Rotation = entries[(ordinal + 1) % entries.size]
 }
 
+enum class WinMetric {
+    HIGHEST, LOWEST;
+}
+
 data class ScoreEntry(
     val id: String = java.util.UUID.randomUUID().toString(),
     val playerId: String,
@@ -25,6 +29,7 @@ data class Game(
     val name: String = "Untitled Game",
     val players: List<Player> = emptyList(),
     val step: Int = 1,
+    val winMetric: WinMetric = WinMetric.HIGHEST,
     val entries: List<ScoreEntry> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
     val finishedAt: Long? = null,
@@ -37,9 +42,17 @@ data class Game(
         players.associate { it.id to currentScore(it.id) }
 
     fun winner(): Player? {
-        if (players.isEmpty()) return null
+        if (players.isEmpty() || entries.isEmpty()) return null
         val scores = players.map { p -> p to currentScore(p.id) }
-        val max = scores.maxOfOrNull { it.second } ?: return null
-        return scores.firstOrNull { it.second == max }?.first
+        return when (winMetric) {
+            WinMetric.HIGHEST -> {
+                val max = scores.maxOf { it.second }
+                scores.firstOrNull { it.second == max }?.first
+            }
+            WinMetric.LOWEST -> {
+                val min = scores.minOf { it.second }
+                scores.firstOrNull { it.second == min }?.first
+            }
+        }
     }
 }

@@ -5,6 +5,7 @@ import com.simplescoring.android.model.Game
 import com.simplescoring.android.model.Player
 import com.simplescoring.android.model.Rotation
 import com.simplescoring.android.model.ScoreEntry
+import com.simplescoring.android.model.WinMetric
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -24,13 +25,22 @@ object GameRepository {
 
     fun loadHistory(): List<Game> {
         if (!::context.isInitialized) throw IllegalStateException("GameRepository not initialized")
-        val raw = historyFile.readText().trim().ifEmpty { "[]" }
-        val arr = JSONArray(raw)
-        val result = mutableListOf<Game>()
-        for (i in 0 until arr.length()) {
-            result.add(gameFromJson(arr.getJSONObject(i)))
+        return try {
+            val raw = historyFile.readText().trim().ifEmpty { "[]" }
+            val arr = JSONArray(raw)
+            val result = mutableListOf<Game>()
+            for (i in 0 until arr.length()) {
+                result.add(gameFromJson(arr.getJSONObject(i)))
+            }
+            result.sortedByDescending { it.finishedAt ?: it.createdAt }
+        } catch (_: Exception) {
+            // Corrupt history file: back it up once and start fresh rather than crashing.
+            try {
+                historyFile.renameTo(File(context.filesDir, "score_history.corrupt.json"))
+                historyFile.writeText("[]")
+            } catch (_: Exception) { }
+            emptyList()
         }
-        return result
     }
 
     fun appendGame(game: Game) {
@@ -58,11 +68,13 @@ object GameRepository {
     }
 
     private fun gameToJson(game: Game): JSONObject = JSONObject().apply {
+        put("id", game.id)
         put("name", game.name)
         put("createdAt", game.createdAt)
         put("finishedAt", game.finishedAt ?: JSONObject.NULL)
         put("winnerId", game.winnerId ?: JSONObject.NULL)
         put("step", game.step)
+        put("winMetric", game.winMetric.ordinal)
         put("players", JSONArray().also { arr ->
             game.players.forEach { arr.put(playerToJson(it)) }
         })
@@ -91,10 +103,10 @@ object GameRepository {
         for (i in 0 until playersArr.length()) {
             val p = playersArr.getJSONObject(i)
             players.add(Player(
-                id = p.getString("id"),
-                name = p.getString("name"),
-                color = p.getInt("color"),
-                rotation = Rotation.entries[p.getInt("rotation")]
+                id = p.optString("id", java.util.UUID.randomUUID().toString()),
+                name = p.optString("name", "Player"),
+                color = p.optInt("color", 0xFF5B9BD5.toInt()),
+                rotation = Rotation.entries.getOrElse(p.optInt("rotation", 0)) { Rotation.NONE }
             ))
         }
         val entriesArr = obj.getJSONArray("entries")
@@ -102,18 +114,20 @@ object GameRepository {
         for (i in 0 until entriesArr.length()) {
             val e = entriesArr.getJSONObject(i)
             entries.add(ScoreEntry(
-                id = e.getString("id"),
-                playerId = e.getString("playerId"),
-                delta = e.getInt("delta"),
-                timestamp = e.getLong("timestamp")
+                id = e.optString("id", java.util.UUID.randomUUID().toString()),
+                playerId = e.optString("playerId", ""),
+                delta = e.optInt("delta", 0),
+                timestamp = e.optLong("timestamp", System.currentTimeMillis())
             ))
         }
         return Game(
-            name = obj.getString("name"),
-            createdAt = obj.getLong("createdAt"),
+            id = obj.optString("id", java.util.UUID.randomUUID().toString()).ifEmpty { java.util.UUID.randomUUID().toString() },
+            name = obj.optString("name", "Untitled Game"),
+            createdAt = obj.optLong("createdAt", System.currentTimeMillis()),
             finishedAt = if (obj.isNull("finishedAt")) null else obj.getLong("finishedAt"),
             winnerId = if (obj.isNull("winnerId")) null else obj.getString("winnerId"),
-            step = obj.getInt("step"),
+            step = obj.optInt("step", 1).coerceAtLeast(1),
+            winMetric = WinMetric.entries.getOrElse(obj.optInt("winMetric", 0)) { WinMetric.HIGHEST },
             players = players,
             entries = entries
         )

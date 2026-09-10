@@ -7,6 +7,7 @@ import com.simplescoring.android.model.Game
 import com.simplescoring.android.model.Player
 import com.simplescoring.android.model.Rotation
 import com.simplescoring.android.model.ScoreEntry
+import com.simplescoring.android.model.WinMetric
 import com.simplescoring.android.repository.GameRepository
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.Job
@@ -42,16 +43,30 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         history.addAll(repository.loadHistory())
     }
 
-    fun startNewGame(playerCount: Int, names: List<String>, colors: List<Int>, step: Int, timerSeconds: Int) {
+    fun startNewGame(
+        playerCount: Int,
+        names: List<String>,
+        colors: List<Int>,
+        step: Int,
+        timerSeconds: Int,
+        boardName: String = "Untitled Game",
+        winMetric: WinMetric = WinMetric.HIGHEST
+    ) {
         val players = (0 until playerCount).map { i ->
             Player(
                 id = UUID.randomUUID().toString(),
-                name = names.getOrElse(i) { "Player ${i + 1}" },
+                name = names.getOrElse(i) { "Player ${i + 1}" }.ifBlank { "Player ${i + 1}" },
                 color = colors.getOrElse(i) { 0xFF5B9BD5.toInt() },
                 rotation = Rotation.NONE
             )
         }
-        _currentGame.value = Game(players = players, step = step, createdAt = System.currentTimeMillis())
+        _currentGame.value = Game(
+            name = boardName.ifBlank { "Untitled Game" },
+            players = players,
+            step = step.coerceAtLeast(1),
+            winMetric = winMetric,
+            createdAt = System.currentTimeMillis()
+        )
         _elapsedSeconds.value = 0L
         undoStack.clear()
         timerJob?.cancel()
