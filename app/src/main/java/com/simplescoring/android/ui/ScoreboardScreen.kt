@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -121,12 +122,17 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     }
 
     fun commitGesture() {
-        val player = activePlayer
+        // NOTE: this is called from inside pointerInput, whose block is not
+        // restarted mid-gesture. It must only read State (current at call
+        // time), never plain vals captured from an old composition.
+        val id = activeId
         val delta = pending
+        val keepLast = latestGame.keepLastVisible
+        val color = latestGame.players.firstOrNull { it.id == id }?.color
         resetGesture()
-        if (player != null && delta != 0) {
-            viewModel.addScore(player.id, delta)
-            if (game.keepLastVisible) lastCommit = player.color to delta
+        if (id != null && delta != 0) {
+            viewModel.addScore(id, delta)
+            if (keepLast && color != null) lastCommit = color to delta
         }
     }
 
@@ -169,9 +175,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 with(density) { 34.dp.toPx() },
                 with(density) { 64.dp.toPx() },
             )
-            val trackWidth = (dotD * 0.55f).coerceIn(
-                with(density) { 10.dp.toPx() },
-                with(density) { 26.dp.toPx() },
+            val trackWidth = (dotD * 0.65f).coerceIn(
+                with(density) { 12.dp.toPx() },
+                with(density) { 30.dp.toPx() },
             )
 
             // Score boxes: rotation-proof squares, sized by player count.
@@ -204,7 +210,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 pending = 0
                             },
                             onDragEnd = { commitGesture() },
-                            onDragCancel = { resetGesture() },
+                            // A cancelled gesture (incoming call, etc.) still
+                            // keeps completed points instead of dropping them.
+                            onDragCancel = { commitGesture() },
                             onDrag = { change, _ ->
                                 change.consume()
                                 if (activeId == null) return@detectDragGestures
@@ -420,13 +428,23 @@ private fun SeatScore(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = text,
-            fontSize = size.sp,
-            fontWeight = FontWeight.Bold,
-            color = color,
-            maxLines = 1,
-            textAlign = TextAlign.Center,
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = player.name,
+                fontSize = (size * 0.24f).coerceAtLeast(10f).sp,
+                color = color,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = text,
+                fontSize = size.sp,
+                fontWeight = FontWeight.Bold,
+                color = color,
+                maxLines = 1,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
