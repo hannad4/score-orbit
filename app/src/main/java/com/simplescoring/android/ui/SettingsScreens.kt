@@ -168,12 +168,6 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         Text("›", color = Color.White.copy(alpha = 0.4f), fontSize = 20.sp)
                     }
                     HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
-                    ToggleRow(
-                        label = "Allow Negative Scores",
-                        checked = game.allowNegative,
-                        onChecked = { viewModel.setAllowNegative(it) },
-                    )
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
                     StepperRow(
                         label = "Score Step",
                         value = "${game.step}",

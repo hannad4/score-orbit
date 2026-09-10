@@ -70,7 +70,6 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         step: Int,
         boardName: String = "My Game",
         winMetric: WinMetric = WinMetric.HIGHEST,
-        allowNegative: Boolean = false,
         keepLastVisible: Boolean = true,
     ) {
         val count = playerCount.coerceIn(1, 12)
@@ -87,7 +86,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             players = players,
             step = step.coerceIn(1, 100),
             winMetric = winMetric,
-            allowNegative = allowNegative,
+            allowNegative = true,
             keepLastVisible = keepLastVisible,
             createdAt = System.currentTimeMillis(),
         )
@@ -106,7 +105,6 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             step = game.step,
             boardName = game.name,
             winMetric = game.winMetric,
-            allowNegative = game.allowNegative,
             keepLastVisible = game.keepLastVisible,
         )
     }
@@ -145,13 +143,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     fun addScore(playerId: String, delta: Int) {
         val game = _currentGame.value ?: return
         if (delta == 0) return
-        var fixed = delta
-        if (!game.allowNegative) {
-            val total = game.currentScore(playerId)
-            if (total + fixed < 0) fixed = -total
-            if (fixed == 0) return
-        }
-        val entry = ScoreEntry(playerId = playerId, delta = fixed, timestamp = System.currentTimeMillis())
+        val entry = ScoreEntry(playerId = playerId, delta = delta, timestamp = System.currentTimeMillis())
         _currentGame.value = game.copy(entries = game.entries + entry)
         undoStack.add(entry)
         redoStack.clear()
@@ -192,10 +184,6 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setStep(step: Int) {
         _currentGame.value = _currentGame.value?.copy(step = step.coerceIn(1, 100))
-    }
-
-    fun setAllowNegative(allow: Boolean) {
-        _currentGame.value = _currentGame.value?.copy(allowNegative = allow)
     }
 
     fun setKeepLastVisible(keep: Boolean) {

@@ -94,7 +94,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     var pending by remember(game.id) { mutableIntStateOf(0) }
     var accRadians by remember(game.id) { mutableFloatStateOf(0f) }
     var lastAngle by remember { mutableFloatStateOf(Float.NaN) }
-    var dragBase by remember { mutableIntStateOf(0) }
 
     val turn = turnValue(game.step)
     val activePlayer = game.players.firstOrNull { it.id == activeId }
@@ -156,12 +155,12 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             // Labels live in rotation-proof square boxes so sideways seats
             // need no more room than upright ones.
             val labelBoxPx = when {
-                n <= 4 -> with(density) { 104.dp.toPx() }
-                n <= 6 -> with(density) { 88.dp.toPx() }
-                n <= 9 -> with(density) { 72.dp.toPx() }
-                else -> with(density) { 60.dp.toPx() }
+                n <= 4 -> with(density) { 96.dp.toPx() }
+                n <= 6 -> with(density) { 80.dp.toPx() }
+                n <= 9 -> with(density) { 64.dp.toPx() }
+                else -> with(density) { 54.dp.toPx() }
             }
-            val gapPx = with(density) { 12.dp.toPx() }
+            val gapPx = with(density) { 22.dp.toPx() }
             val marginPx = with(density) { 6.dp.toPx() }
             var ringR = minDim * 0.30f
             var dotD = with(density) { 56.dp.toPx() }
@@ -176,7 +175,10 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 if (need > avail) ringR -= (need - avail)
             }
             ringR = ringR.coerceAtLeast(with(density) { 40.dp.toPx() })
-            val trackWidth = dotD * 1.12f
+            val trackWidth = (dotD * 0.55f).coerceIn(
+                with(density) { 10.dp.toPx() },
+                with(density) { 26.dp.toPx() },
+            )
             val labelR = ringR + dotD / 2f + gapPx
             val scoreSp = (labelBoxPx * 0.42f / density.density).coerceIn(18f, 60f)
 
@@ -187,7 +189,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(game.id, game.step, game.allowNegative) {
+                    .pointerInput(game.id, game.step) {
                         detectDragGestures(
                             onDragStart = { offset ->
                                 val g = latestGame
@@ -195,7 +197,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 val seat = nearestSeat(offset, Offset(cx, cy), g.players.size)
                                 val id = g.players[seat].id
                                 activeId = id
-                                dragBase = g.currentScore(id)
                                 lastAngle = atan2(
                                     (offset.y - cy).toDouble(),
                                     (offset.x - cx).toDouble()
@@ -207,7 +208,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             onDragCancel = { resetGesture() },
                             onDrag = { change, _ ->
                                 change.consume()
-                                val g = latestGame
                                 if (activeId == null) return@detectDragGestures
                                 if (lastAngle.isNaN()) {
                                     lastAngle = atan2(
@@ -229,10 +229,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 }
                                 lastAngle = angle
                                 accRadians += delta
-                                var p = (accRadians / (2f * PI.toFloat()) * turn).roundToInt()
-                                if (!g.allowNegative) {
-                                    p = p.coerceAtLeast(-dragBase)
-                                }
+                                val p = (accRadians / (2f * PI.toFloat()) * turn).roundToInt()
                                 if (p != pending) {
                                     pending = p
                                     buzz(ctx, 6)
