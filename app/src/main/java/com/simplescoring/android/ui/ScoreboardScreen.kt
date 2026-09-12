@@ -89,6 +89,17 @@ private fun nearestSeat(point: Offset, center: Offset, total: Int): Int {
     return best
 }
 
+/** Find nearest anchor (non-side) player index to [i]. */
+private fun findNearestAnchor(i: Int, n: Int, sideThreshold: Float, positions: Array<Offset?>): Int {
+    for (offset in 1..n / 2) {
+        val cw = (i + offset) % n
+        val ccw = (i - offset + n) % n
+        if (positions[cw] != null) return cw
+        if (positions[ccw] != null) return ccw
+    }
+    return -1
+}
+
 /**
  * Distance from [center] along [dir] to the inside of the rect
  * [0, w]x[0, h] shrunk by [margin]. Used to push score labels out to the
@@ -296,14 +307,94 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 }
 
                 // Scores pushed out to the screen edges along each seat ray.
-                game.players.forEachIndexed { i, player ->
+                // Side players (near 90°/270°) stack vertically near anchors
+                // instead of rotating and overlapping the central UI.
+                val sideThreshold = 0.7f // |cos(angle)| below this = side player
+
+                // Pre-compute label positions for anchor players.
+                val labelPositions = Array(n) { null as Offset? }
+                for (i in 0 until n) {
                     val a = seatAngle(i, n)
-                    val dir = Offset(cos(a).toFloat(), sin(a).toFloat())
-                    val maxDist = rayToEdge(center, dir, wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
-                    val dist = min(1.85f * ringR, maxDist)
-                        .coerceAtLeast(ringR + dotD / 2f + with(density) { 8.dp.toPx() })
-                    val lx = cx + dir.x * dist
-                    val ly = cy + dir.y * dist
+                    val dirX = cos(a).toFloat()
+                    val dirY = sin(a).toFloat()
+                    if (abs(dirX) >= sideThreshold) {
+                        val maxDist = rayToEdge(center, Offset(dirX, dirY), wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
+                        val dist = min(1.85f * ringR, maxDist)
+                            .coerceAtLeast(ringR + dotD / 2f + with(density) { 8.dp.toPx() })
+                        labelPositions[i] = Offset(cx + dirX * dist, cy + dirY * dist)
+                    }
+                }
+
+                // For each side player, find nearest anchor and stack vertically.
+                val stackOffset = labelBoxPx + with(density) { 8.dp.toPx() }
+                for (i in 0 until n) {
+                    val a = seatAngle(i, n)
+                    val dirX = cos(a).toFloat()
+                    if (abs(dirX) >= sideThreshold) continue // anchor, already placed
+
+                    // Find nearest anchor.
+                    var anchorIdx = -1
+                    var anchorDist = n + 1
+                    for (offset in 1..n / 2) {
+                        val cw = (i + offset) % n
+                        val ccw = (i - offset + n) % n
+                        if (labelPositions[cw] != null && offset < anchorDist) {
+                            anchorIdx = cw
+                            anchorDist = offset
+                        }
+                        if (labelPositions[ccw] != null && offset < anchorDist) {
+                            anchorIdx = ccw
+                            anchorDist = offset
+                        }
+                    }
+
+                    if (anchorIdx < 0) {
+                        // No anchor found (all players are side players); fall back to edge.
+                        val dirY = sin(a).toFloat()
+                        val maxDist = rayToEdge(center, Offset(dirX, dirY), wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
+                        val dist = min(1.85f * ringR, maxDist)
+                            .coerceAtLeast(ringR + dotD / 2f + with(density) { 8.dp.toPx() })
+                        labelPositions[i] = Offset(cx + dirX * dist, cy + dirY * dist)
+                        continue
+                    }
+
+                    val anchorPos = labelPositions[anchorIdx]!!
+                    val anchorAngle = seatAngle(anchorIdx, n)
+
+                    // Determine above/below based on angular position.
+                    var angleDiff = a - anchorAngle
+                    while (angleDiff > PI) angleDiff -= 2 * PI
+                    while (angleDiff < -PI) angleDiff += 2 * PI
+                    val above = angleDiff < 0
+
+                    // Count how many side players are already stacked here.
+                    var stackCount = 0
+                    for (j in 0 until n) {
+                        if (j == i) continue
+                        val jAngle = seatAngle(j, n)
+                        val jDirX = cos(jAngle).toFloat()
+                        if (abs(jDirX) >= sideThreshold) continue
+                        val jAnchor = findNearestAnchor(j, n, sideThreshold, labelPositions)
+                        if (jAnchor == anchorIdx) {
+                            var jDiff = jAngle - anchorAngle
+                            while (jDiff > PI) jDiff -= 2 * PI
+                            while (jDiff < -PI) jDiff += 2 * PI
+                            val jAbove = jDiff < 0
+                            if (jAbove == above) stackCount++
+                        }
+                    }
+
+                    // Offset by stack count to avoid overlap.
+                    val totalOffset = stackOffset * (stackCount + 1)
+                    labelPositions[i] = Offset(
+                        anchorPos.x,
+                        if (above) anchorPos.y - totalOffset else anchorPos.y + totalOffset
+                    )
+                }
+
+                // Render all labels.
+                game.players.forEachIndexed { i, player ->
+                    val pos = labelPositions[i]!!
                     val isActive = activeId == player.id
                     val showingPending = isActive && pending != 0
                     SeatScore(
@@ -318,8 +409,8 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         boxDp = dp(labelBoxPx),
                         dimmed = activeId != null && !isActive,
                         offsetPx = IntOffset(
-                            x = (lx - labelBoxPx / 2f).toInt(),
-                            y = (ly - labelBoxPx / 2f).toInt(),
+                            x = (pos.x - labelBoxPx / 2f).toInt(),
+                            y = (pos.y - labelBoxPx / 2f).toInt(),
                         ),
                         onTap = {
                             buzz(ctx, 10)
