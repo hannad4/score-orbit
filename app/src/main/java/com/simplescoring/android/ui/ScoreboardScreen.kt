@@ -8,16 +8,22 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -323,6 +329,46 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 }
             }
         }
+
+        // Undo/redo row like the score history page.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp, horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+        ) {
+            PillButton(
+                label = "Undo",
+                icon = { Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, tint = Color(0xFF0A84FF), modifier = Modifier.size(18.dp)) },
+                enabled = viewModel.undoStack.isNotEmpty(),
+                onClick = { viewModel.undo() },
+            )
+            PillButton(
+                label = "Redo",
+                icon = { Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null, tint = Color(0xFF0A84FF), modifier = Modifier.size(18.dp)) },
+                enabled = viewModel.redoStack.isNotEmpty(),
+                onClick = { viewModel.redo() },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PillButton(label: String, icon: @Composable () -> Unit, enabled: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.White.copy(alpha = 0.12f),
+            contentColor = Color(0xFF0A84FF),
+            disabledContainerColor = Color.White.copy(alpha = 0.06f),
+            disabledContentColor = Color.White.copy(alpha = 0.3f),
+        ),
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        icon()
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(label)
     }
 }
 
