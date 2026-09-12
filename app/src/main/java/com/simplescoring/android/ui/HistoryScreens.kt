@@ -86,7 +86,7 @@ fun ScoreHistoryScreen(game: Game, viewModel: ScoreViewModel) {
             }
         } else {
             LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                items(game.entries, key = { it.id }) { entry ->
+                items(game.entries.asReversed(), key = { it.id }) { entry ->
                     val player = game.players.firstOrNull { it.id == entry.playerId }
                     val color = player?.let { Color(it.color) } ?: Color.White.copy(alpha = 0.5f)
                     Text(
