@@ -192,10 +192,8 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 with(density) { 34.dp.toPx() },
                 with(density) { 64.dp.toPx() },
             )
-            val trackWidth = (dotD * 0.65f).coerceIn(
-                with(density) { 12.dp.toPx() },
-                with(density) { 30.dp.toPx() },
-            )
+            // Track matches dot size so sliders sit flush on the ring.
+            val trackWidth = dotD
 
             // Score boxes: rotation-proof squares, sized by player count.
             val labelBoxPx = when {
