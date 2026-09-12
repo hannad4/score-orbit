@@ -39,3 +39,13 @@ gradle/LICENSE
 gradle/NOTICE
 gradle/README
 gradle/wrapper/gradle-wrapper-shared-*.jar
+
+# Local project-specific info
+.pi/
+.claude/
+.hermes/
+.codex/
+.cursor/
+.aider/
+.devin/
+.windsurf/
