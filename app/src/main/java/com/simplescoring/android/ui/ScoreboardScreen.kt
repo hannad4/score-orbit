@@ -1,5 +1,8 @@
 package com.simplescoring.android.ui
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,6 +40,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +49,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -69,6 +75,8 @@ import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /** Points scored by one full turn of the ring, scaled by the score step. */
 private fun turnValue(step: Int) = 10 * step.coerceAtLeast(1)
@@ -173,12 +181,17 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     var lastAngle by remember { mutableFloatStateOf(Float.NaN) }
     // Last committed delta, flashed in the middle of the ring (iOS behavior).
     var lastCommit by remember(game.id) { mutableStateOf<Pair<Int, Int>?>(null) }
+    // In-flight "spring back" animation that unwinds the dial after release.
+    val scope = rememberCoroutineScope()
+    var springJob by remember(game.id) { mutableStateOf<Job?>(null) }
 
     val turn = turnValue(game.step)
     val activeIndex = game.players.indexOfFirst { it.id == activeId }
     val activePlayer = activeIndex.takeIf { it >= 0 }?.let { game.players[it] }
 
     fun resetGesture() {
+        springJob?.cancel()
+        springJob = null
         activeId = null
         pending = 0
         accRadians = 0f
@@ -193,10 +206,38 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
         val delta = pending
         val keepLast = latestGame.keepLastVisible
         val color = latestGame.players.firstOrNull { it.id == id }?.color
-        resetGesture()
         if (id != null && delta != 0) {
             viewModel.addScore(id, delta)
             if (keepLast && color != null) lastCommit = color to delta
+        }
+        lastAngle = Float.NaN
+
+        // Like a real rotary dial's return spring: unwind back to rest
+        // instead of snapping instantly. Only the current lap's remainder
+        // needs to travel — whole laps beyond that look identical once
+        // wrapped, so animating the full accumulated distance would just
+        // spin needlessly. activeId/pending stay put until the spring
+        // settles, so the dots, trail and marker keep animating back in
+        // place instead of vanishing immediately.
+        springJob?.cancel()
+        val remainder = accRadians % (2f * PI.toFloat())
+        accRadians = remainder
+        springJob = scope.launch {
+            animate(
+                initialValue = remainder,
+                targetValue = 0f,
+                // Settling time scales with 1/sqrt(stiffness), so a quarter
+                // of StiffnessMedium (1500) takes ~2x as long to settle —
+                // half speed.
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium / 4f,
+                ),
+            ) { value, _ -> accRadians = value }
+            accRadians = 0f
+            activeId = null
+            pending = 0
+            springJob = null
         }
     }
 
@@ -285,6 +326,10 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             onDragStart = { offset ->
                                 val g = latestGame
                                 if (g.players.isEmpty()) return@detectDragGestures
+                                // Grabbing the dial again mid spring-back cancels the
+                                // return animation instead of fighting it for control
+                                // of accRadians.
+                                resetGesture()
                                 val seat = nearestSeat(offset, center, g.players.size)
                                 activeId = g.players[seat].id
                                 lastCommit = null
@@ -338,28 +383,59 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     ringRPx = ringR,
                     trackPx = trackWidth,
                     activeColor = activePlayer?.let { Color(it.color) },
-                    // Arc trails from the player's dot along the drag.
+                    // Arc trails from the player's dot along the drag. Not
+                    // clamped to one lap: RingDial itself turns anything
+                    // beyond 360° into a stacked, full-circle fade instead of
+                    // truncating the visual at the first turn.
                     arcStartDeg = activeIndex.takeIf { it >= 0 }
                         ?.let { (seatAngle(it, n) * 180.0 / PI).toFloat() } ?: -90f,
-                    arcSweepDeg = (accRadians * 180f / PI.toFloat()).coerceIn(-360f, 360f),
+                    arcSweepDeg = accRadians * 180f / PI.toFloat(),
                 )
 
-                // Center flash of the last committed delta (iOS "keep last visible").
-                val flash = lastCommit
-                if (activeId == null && flash != null) {
-                    val (colorInt, delta) = flash
-                    Text(
-                        text = if (delta > 0) "+$delta" else "$delta",
-                        fontSize = (scoreSp * 1.1f).sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(colorInt),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.align(Alignment.Center),
-                    )
+                // Center readout: while dragging, the live pending delta
+                // (easy to lose under the player label once there are many
+                // players); once released, the last committed delta flashes
+                // here instead (iOS "keep last visible"). Tapping the
+                // post-commit flash opens the score history, where past
+                // entries can be undone/redone.
+                if (activeId != null && pending != 0) {
+                    val color = activePlayer?.color
+                    if (color != null) {
+                        Text(
+                            text = if (pending > 0) "+$pending" else "$pending",
+                            fontSize = (scoreSp * 1.1f).sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(color),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.align(Alignment.Center),
+                        )
+                    }
+                } else {
+                    val flash = lastCommit
+                    if (activeId == null && flash != null) {
+                        val (colorInt, delta) = flash
+                        Text(
+                            text = if (delta > 0) "+$delta" else "$delta",
+                            fontSize = (scoreSp * 1.1f).sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(colorInt),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = { viewModel.go(AppScreen.ScoreHistory) },
+                                ),
+                        )
+                    }
                 }
 
                 game.players.forEachIndexed { i, player ->
-                    val a = seatAngle(i, n)
+                    // While dragging, the whole wheel of dots turns together
+                    // with the touch (a real rotary dial's disk), rather than
+                    // just the active player's own trail moving in place.
+                    val a = if (activeId != null) seatAngle(i, n) + accRadians else seatAngle(i, n)
                     SeatDot(
                         color = Color(player.color),
                         sizeDp = dp(dotD),
@@ -637,17 +713,77 @@ private fun RingDial(
             center = center,
             style = Stroke(width = trackPx),
         )
-        if (activeColor != null && arcSweepDeg != 0f) {
-            drawArc(
+        if (activeColor != null) {
+            val tipDeg = arcStartDeg + arcSweepDeg
+            if (arcSweepDeg != 0f) {
+                // Comet trail: full opacity at the touch point, fading to
+                // 10% one full turn behind it. Sampled as a sweep gradient
+                // fixed in absolute canvas angle (not rotated to the moving
+                // tip), so drawArc/drawCircle can just sample it directly.
+                // Past one lap the whole ring is covered by the same
+                // periodic fade, which is what makes extra laps "stack"
+                // instead of erasing the earlier trail.
+                val trailBrush = Brush.sweepGradient(
+                    colors = trailFadeColors(activeColor, tipDeg, clockwise = arcSweepDeg >= 0f),
+                    center = center,
+                )
+                if (abs(arcSweepDeg) >= 360f) {
+                    drawCircle(
+                        brush = trailBrush,
+                        radius = ringRPx,
+                        center = center,
+                        style = Stroke(width = trackPx),
+                    )
+                } else {
+                    // Round cap: the trailing (oldest) end tapers off into a
+                    // disk the same size as the original seat dot (track
+                    // width == dot diameter) instead of a flat cut-off. The
+                    // tip end is rounded too, but the touch-marker disk
+                    // drawn below fully covers it either way.
+                    drawArc(
+                        brush = trailBrush,
+                        startAngle = arcStartDeg,
+                        sweepAngle = arcSweepDeg,
+                        useCenter = false,
+                        topLeft = Offset(center.x - ringRPx, center.y - ringRPx),
+                        size = Size(ringRPx * 2f, ringRPx * 2f),
+                        style = Stroke(width = trackPx, cap = StrokeCap.Round),
+                    )
+                }
+            }
+
+            // Touch-marker disk: a bead riding the ring's channel at the
+            // live input position, bigger than the track so it reads as the
+            // "now" point against the fading trail behind it.
+            val tipRad = tipDeg * PI.toFloat() / 180f
+            drawCircle(
                 color = activeColor,
-                startAngle = arcStartDeg,
-                sweepAngle = arcSweepDeg,
-                useCenter = false,
-                topLeft = Offset(center.x - ringRPx, center.y - ringRPx),
-                size = Size(ringRPx * 2f, ringRPx * 2f),
-                style = Stroke(width = trackPx),
+                radius = trackPx * 0.7f,
+                center = Offset(
+                    center.x + cos(tipRad) * ringRPx,
+                    center.y + sin(tipRad) * ringRPx,
+                ),
             )
         }
+    }
+}
+
+/**
+ * Sweep-gradient color stops (absolute canvas angle, 0..360, first and last
+ * matching for a seamless wrap) giving [color] full opacity at [tipDeg] and
+ * fading to 10% opacity one full turn behind it, in the direction opposite
+ * travel ([clockwise]).
+ */
+private fun trailFadeColors(color: Color, tipDeg: Float, clockwise: Boolean): List<Color> {
+    val stops = 96
+    return List(stops + 1) { i ->
+        val absDeg = i / stops.toFloat() * 360f
+        val back = if (clockwise) {
+            (((tipDeg - absDeg) % 360f) + 360f) % 360f
+        } else {
+            (((absDeg - tipDeg) % 360f) + 360f) % 360f
+        }
+        color.copy(alpha = (1f - 0.9f * (back / 360f)).coerceIn(0.1f, 1f))
     }
 }
 
