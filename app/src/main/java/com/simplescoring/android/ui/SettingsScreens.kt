@@ -328,7 +328,13 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
         // Mini ring preview.
         RingPreview(players = game.players, modifier = Modifier.align(Alignment.CenterHorizontally))
 
-        game.players.forEach { player ->
+        game.players.forEachIndexed { index, player ->
+            // Untouched players carry the default "Player N" name. Tapping
+            // the box auto-deletes it so typing starts clean; tapping a
+            // customized name just selects all text instead. (Select-all
+            // alone isn't reliable: the tap that focuses the field re-places
+            // the cursor after focus, clobbering the selection on device.)
+            val defaultName = "Player ${index + 1}"
             Card(
                 colors = CardDefaults.cardColors(containerColor = CardBg),
                 shape = RoundedCornerShape(12.dp),
@@ -351,6 +357,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                             viewModel.renamePlayer(player.id, it.text)
                         },
                         singleLine = true,
+                        placeholder = { Text(defaultName) },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(
                             onDone = { focusManager.clearFocus() }
@@ -359,9 +366,13 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                             .weight(1f)
                             .onFocusChanged { focus ->
                                 if (focus.isFocused) {
-                                    nameField = nameField.copy(
-                                        selection = TextRange(0, nameField.text.length)
-                                    )
+                                    if (nameField.text == defaultName) {
+                                        nameField = TextFieldValue("")
+                                    } else {
+                                        nameField = nameField.copy(
+                                            selection = TextRange(0, nameField.text.length)
+                                        )
+                                    }
                                 } else if (nameField.text.isBlank()) {
                                     nameField = TextFieldValue(player.name)
                                 }

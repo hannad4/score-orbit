@@ -241,32 +241,37 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
         lastAngle = Float.NaN
 
         // Like a real rotary dial's return spring: unwind back to rest
-        // instead of snapping instantly. Only the current lap's remainder
-        // needs to travel — whole laps beyond that look identical once
-        // wrapped, so animating the full accumulated distance would just
-        // spin needlessly. The remainder is wrapped to the shortest path
-        // (<= half a turn) so the return travels the same distance and
-        // duration no matter which player, direction, or lap count.
+        // instead of snapping instantly. Always the LONG way home — carry
+        // on past rest to the equivalent +/-2pi instead of reversing — so
+        // every release gets the same grand unwind no matter the player,
+        // direction, or lap count. Whole laps beyond the remainder look
+        // identical once wrapped, so they don't need to travel.
         springJob?.cancel()
-        var r = accRadians % (2f * PI.toFloat())
-        if (r > PI.toFloat()) r -= 2f * PI.toFloat()
-        else if (r < -PI.toFloat()) r += 2f * PI.toFloat()
-        accRadians = r
-        springJob = scope.launch {
-            animate(
-                initialValue = r,
-                targetValue = 0f,
-                // Slow, visible rotary return (~1s): settling time scales
-                // with 1/sqrt(stiffness), so ~130 takes roughly 3x as long
-                // as StiffnessMedium (1500) to settle.
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = 130f,
-                ),
-            ) { value, _ -> accRadians = value }
+        val r = accRadians % (2f * PI.toFloat())
+        if (abs(r) < 0.05f) {
+            // Already (visually) home: nothing to unwind.
             accRadians = 0f
             activeId = null
             springJob = null
+        } else {
+            val target = if (r > 0f) 2f * PI.toFloat() else -2f * PI.toFloat()
+            accRadians = r
+            springJob = scope.launch {
+                animate(
+                    initialValue = r,
+                    targetValue = target,
+                    // Slow, visible rotary return: settling time scales with
+                    // 1/sqrt(stiffness), so ~130 takes roughly 3x as long as
+                    // StiffnessMedium (1500) to settle.
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = 130f,
+                    ),
+                ) { value, _ -> accRadians = value }
+                accRadians = 0f
+                activeId = null
+                springJob = null
+            }
         }
     }
 
@@ -303,7 +308,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             fun dp(px: Float): Dp = with(density) { px.toDp() }
 
             // Ring sized like iOS; dots sit on it.
-            val ringR = minDim * 0.32f
+            val ringR = minDim * 0.34f
             val share = (2 * PI.toFloat() * ringR / n) * 0.68f
             val dotD = share.coerceIn(
                 with(density) { 34.dp.toPx() },
@@ -424,23 +429,38 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     arcSweepDeg = accRadians * 180f / PI.toFloat(),
                 )
 
-                // Center readout: while dragging, the live pending delta
-                // (easy to lose under the player label once there are many
-                // players); once released, the last committed delta flashes
-                // here instead (iOS "keep last visible"). Tapping the
-                // post-commit flash opens the score history, where past
-                // entries can be undone/redone.
-                if (activeId != null && pending != 0) {
-                    val color = activePlayer?.color
-                    if (color != null) {
-                        Text(
-                            text = if (pending > 0) "+$pending" else "$pending",
-                            fontSize = (scoreSp * 1.1f).sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(color),
-                            textAlign = TextAlign.Center,
+                // Center readout: while dragging, the spinning player's name
+                // plus live pending delta; once released, the committed
+                // name + delta keeps showing in the same spot until it
+                // fades (iOS "keep last visible"). Same layout throughout,
+                // so nothing blinks in and out between spin and flash.
+                // Tapping the post-commit flash opens the score history.
+                if (activeId != null) {
+                    val p = activePlayer
+                    if (p != null) {
+                        val c = Color(p.color)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.align(Alignment.Center),
-                        )
+                        ) {
+                            Text(
+                                text = p.name,
+                                fontSize = (scoreSp * 0.32f).coerceAtLeast(12f).sp,
+                                color = c,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                            )
+                            if (pending != 0) {
+                                Text(
+                                    text = if (pending > 0) "+$pending" else "$pending",
+                                    fontSize = (scoreSp * 1.1f).sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = c,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
                     }
                 } else {
                     val flash = lastFlash
