@@ -267,7 +267,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     // StiffnessMedium (1500) to settle.
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = 30f,
+                        stiffness = 70f,
                     ),
                 ) { value, _ -> accRadians = value }
                 accRadians = 0f
@@ -316,12 +316,10 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 with(density) { 34.dp.toPx() },
                 with(density) { 64.dp.toPx() },
             )
-            // Track matched to the dots so the dial reads as one solid
-            // rotary wheel.
-            val trackWidth = dotD.coerceIn(
-                with(density) { 16.dp.toPx() },
-                with(density) { 36.dp.toPx() },
-            )
+            // Track exactly matches the dot diameter (derived from the same
+            // already-clamped value, never capped separately) so the ring
+            // and the colored circles are always the same thickness.
+            val trackWidth = dotD
 
             // Score boxes: rotation-proof squares, sized by player count.
             // 4-6 players sit at diagonal corners (see manualLabelAngles),
