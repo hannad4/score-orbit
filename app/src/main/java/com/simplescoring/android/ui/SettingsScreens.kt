@@ -4,6 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,9 +48,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -330,11 +337,35 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // Select-all on focus so typing replaces the default
+                    // "Player N" text instead of appending to it. Blanked
+                    // names fall back to the stored name on blur.
+                    var nameField by remember(player.id) {
+                        mutableStateOf(TextFieldValue(player.name))
+                    }
+                    val focusManager = LocalFocusManager.current
                     OutlinedTextField(
-                        value = player.name,
-                        onValueChange = { viewModel.renamePlayer(player.id, it) },
+                        value = nameField,
+                        onValueChange = {
+                            nameField = it
+                            viewModel.renamePlayer(player.id, it.text)
+                        },
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onDone = { focusManager.clearFocus() }
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .onFocusChanged { focus ->
+                                if (focus.isFocused) {
+                                    nameField = nameField.copy(
+                                        selection = TextRange(0, nameField.text.length)
+                                    )
+                                } else if (nameField.text.isBlank()) {
+                                    nameField = TextFieldValue(player.name)
+                                }
+                            },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color(player.color),
                             unfocusedTextColor = Color(player.color),

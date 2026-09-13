@@ -226,12 +226,12 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             animate(
                 initialValue = remainder,
                 targetValue = 0f,
-                // Settling time scales with 1/sqrt(stiffness), so a quarter
-                // of StiffnessMedium (1500) takes ~2x as long to settle —
-                // half speed.
+                // Slow, visible rotary return (~1s): settling time scales
+                // with 1/sqrt(stiffness), so ~130 takes roughly 3x as long
+                // as StiffnessMedium (1500) to settle.
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMedium / 4f,
+                    stiffness = 130f,
                 ),
             ) { value, _ -> accRadians = value }
             accRadians = 0f
@@ -435,11 +435,13 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     // While dragging, the whole wheel of dots turns together
                     // with the touch (a real rotary dial's disk), rather than
                     // just the active player's own trail moving in place.
+                    // Only the spinning player's dot stays visible — the rest
+                    // get out of the way until the gesture ends.
+                    if (activeId != null && activeId != player.id) return@forEachIndexed
                     val a = if (activeId != null) seatAngle(i, n) + accRadians else seatAngle(i, n)
                     SeatDot(
                         color = Color(player.color),
                         sizeDp = dp(dotD),
-                        dimmed = activeId != null && activeId != player.id,
                         offsetPx = IntOffset(
                             x = (cx + cos(a).toFloat() * ringR - dotD / 2f).toInt(),
                             y = (cy + sin(a).toFloat() * ringR - dotD / 2f).toInt(),
@@ -735,6 +737,12 @@ private fun RingDial(
                         style = Stroke(width = trackPx),
                     )
                 } else {
+                    // Negative sweeps don't rasterize on this canvas path,
+                    // so counter-clockwise drags are redrawn as the
+                    // equivalent positive sweep back from the tip. The
+                    // visible trail and tip position are identical either
+                    // way — this just guarantees both directions render.
+                    val start = if (arcSweepDeg >= 0f) arcStartDeg else tipDeg
                     // Round cap: the trailing (oldest) end tapers off into a
                     // disk the same size as the original seat dot (track
                     // width == dot diameter) instead of a flat cut-off. The
@@ -742,8 +750,8 @@ private fun RingDial(
                     // drawn below fully covers it either way.
                     drawArc(
                         brush = trailBrush,
-                        startAngle = arcStartDeg,
-                        sweepAngle = arcSweepDeg,
+                        startAngle = start,
+                        sweepAngle = abs(arcSweepDeg),
                         useCenter = false,
                         topLeft = Offset(center.x - ringRPx, center.y - ringRPx),
                         size = Size(ringRPx * 2f, ringRPx * 2f),
@@ -792,7 +800,6 @@ private fun trailFadeColors(color: Color, tipDeg: Float, clockwise: Boolean): Li
 private fun SeatDot(
     color: Color,
     sizeDp: Dp,
-    dimmed: Boolean,
     offsetPx: IntOffset,
     onTap: () -> Unit,
 ) {
@@ -800,7 +807,6 @@ private fun SeatDot(
         modifier = Modifier
             .offset { offsetPx }
             .size(sizeDp)
-            .alpha(if (dimmed) 0.35f else 1f)
             .clip(CircleShape)
             .background(color)
             .clickable(
