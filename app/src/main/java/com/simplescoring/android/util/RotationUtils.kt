@@ -15,7 +15,7 @@ object RotationUtils {
      * Sensible initial label orientation for a player seated at [index] of
      * [total] seats around a ring (seat 0 at the top, clockwise).
      * Top/bottom seats read upright; left/right seats face outward.
-     * Matches the iOS tabletop layout; the user can still tap to rotate.
+     * Top/bottom seats read upright; left/right seats face outward.
      */
     fun defaultForPosition(index: Int, total: Int): Rotation {
         if (total <= 0) return Rotation.NONE

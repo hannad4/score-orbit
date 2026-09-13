@@ -147,9 +147,11 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
 
                 Button(
                     onClick = { showRestartConfirm = true },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
                 ) {
-                    Text("Start a New Game")
+                    Text("Start a New Game", style = MaterialTheme.typography.titleMedium)
                 }
 
                 SettingsGroup(label = "Game setup") {
@@ -309,10 +311,10 @@ private fun StepperControl(
         }
         Text(
             value,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
-            modifier = Modifier.width(40.dp),
+            modifier = Modifier.width(48.dp),
         )
         FilledTonalIconButton(onClick = onPlus, enabled = plusEnabled, modifier = Modifier.size(36.dp)) {
             Icon(Icons.Default.Add, contentDescription = "Increase")
@@ -339,13 +341,6 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                 navigationIcon = {
                     IconButton(onClick = { viewModel.go(AppScreen.Settings) }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    if (game.players.size < 12) {
-                        IconButton(onClick = { viewModel.addPlayer() }) {
-                            Icon(Icons.Default.PersonAdd, contentDescription = "Add player")
-                        }
                     }
                 },
                 scrollBehavior = scrollBehavior,

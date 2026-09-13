@@ -39,7 +39,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         loadHistory()
-        // Launch straight into a scoreboard like the iOS app does.
+        // Launch straight into a scoreboard.
         if (_currentGame.value == null) {
             startNewGame(
                 playerCount = 2,
@@ -95,7 +95,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         _screen.value = AppScreen.Board
     }
 
-    /** Fresh scores, same setup (iOS "Start a New Game"). */
+    /** Fresh scores, same setup. */
     fun restartWithSameSetup() {
         val game = _currentGame.value ?: return
         startNewGame(

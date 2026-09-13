@@ -19,14 +19,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.automirrored.filled.Redo
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -159,7 +154,7 @@ private fun manualLabelAngles(n: Int): List<Double>? {
 /**
  * Distance from [center] along [dir] to the inside of the rect
  * [0, w]x[0, h] shrunk by [margin]. Used to push score labels out to the
- * screen edges like the iOS tabletop layout.
+ * screen edges for the tabletop layout.
  */
 private fun rayToEdge(center: Offset, dir: Offset, w: Float, h: Float, margin: Float): Float {
     var t = Float.MAX_VALUE
@@ -298,29 +293,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 },
             )
         },
-        bottomBar = {
-            BottomAppBar(
-                actions = {
-                    IconButton(
-                        onClick = { viewModel.undo() },
-                        enabled = viewModel.undoStack.isNotEmpty(),
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
-                    }
-                    IconButton(
-                        onClick = { viewModel.redo() },
-                        enabled = viewModel.redoStack.isNotEmpty(),
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
-                    }
-                },
-                floatingActionButton = {
-                    FloatingActionButton(onClick = { viewModel.finishGame() }) {
-                        Icon(Icons.Default.Check, contentDescription = "Finish game")
-                    }
-                },
-            )
-        },
     ) { innerPadding ->
         BoxWithConstraints(
             modifier = Modifier
@@ -339,7 +311,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             val minDim = min(wPx, hPx)
             fun dp(px: Float): Dp = with(density) { px.toDp() }
 
-            // Ring sized like iOS; dots sit on it. Both run 15% slimmed
+            // Ring sized for the narrow side; dots sit on it. Both run 15% slimmed
             // down from raw scale so the dial doesn't crowd the labels.
             val ringR = minDim * 0.34f
             val share = (2 * PI.toFloat() * ringR / n) * 0.68f
