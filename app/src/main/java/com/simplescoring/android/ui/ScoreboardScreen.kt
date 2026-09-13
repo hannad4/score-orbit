@@ -280,8 +280,12 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 with(density) { 34.dp.toPx() },
                 with(density) { 64.dp.toPx() },
             )
-            // Track matches dot size so sliders sit flush on the ring.
-            val trackWidth = dotD
+            // Track slightly slimmer than the dots so the ring reads as a
+            // channel the dots sit in, not a solid disk.
+            val trackWidth = (dotD * 0.8f).coerceIn(
+                with(density) { 12.dp.toPx() },
+                with(density) { 32.dp.toPx() },
+            )
 
             // Score boxes: rotation-proof squares, sized by player count.
             // 4-6 players sit at diagonal corners (see manualLabelAngles),
@@ -467,10 +471,13 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 // far row (screen edge) — since a half that crowded usually
                 // has no natural anchor left to stack from.
                 val labelPositions = Array(n) { null as Offset? }
-                val stackOffset = labelBoxPx + with(density) { 8.dp.toPx() }
+                val stackOffset = labelBoxPx + with(density) { 12.dp.toPx() }
+                // Minimum breathing room between a label and the ring/dots so
+                // crowded boards never read as clipped into the dial.
+                val labelClearPx = with(density) { 20.dp.toPx() }
                 val manualAngles = manualLabelAngles(n)
                 if (n >= 7) {
-                    val nearD = ringR + dotD / 2f + with(density) { 8.dp.toPx() }
+                    val nearD = ringR + dotD / 2f + labelClearPx
                     val farD = nearD + stackOffset
                     val xMin = edgeMarginPx + labelBoxPx / 2f
                     val xMax = wPx - edgeMarginPx - labelBoxPx / 2f
@@ -519,7 +526,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         val dirY = sin(a).toFloat()
                         val maxDist = rayToEdge(center, Offset(dirX, dirY), wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
                         val dist = min(1.85f * ringR, maxDist)
-                            .coerceAtLeast(ringR + dotD / 2f + with(density) { 8.dp.toPx() })
+                            .coerceAtLeast(ringR + dotD / 2f + labelClearPx)
                         val occurrence = used.getOrDefault(angleDeg, 0)
                         used[angleDeg] = occurrence + 1
                         // coerceAtMost keeps a doubled-up slot's outer occupant
@@ -549,7 +556,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         val dirY = sin(a).toFloat()
                         val maxDist = rayToEdge(center, Offset(dirX, dirY), wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
                         val dist = min(1.85f * ringR, maxDist)
-                            .coerceAtLeast(ringR + dotD / 2f + with(density) { 8.dp.toPx() })
+                            .coerceAtLeast(ringR + dotD / 2f + labelClearPx)
                         labelPositions[i] = Offset(cx + dirX * dist, cy + dirY * dist)
                     }
 
@@ -574,7 +581,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             // reaching across to an anchor on the other half.
                             val maxDist = rayToEdge(center, Offset(dirX, dirY), wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
                             val dist = min(1.85f * ringR, maxDist)
-                                .coerceAtLeast(ringR + dotD / 2f + with(density) { 8.dp.toPx() })
+                                .coerceAtLeast(ringR + dotD / 2f + labelClearPx)
                             anchorPosOf[i] = Offset(cx + dirX * dist, cy + dirY * dist)
                             aboveOf[i] = topHalf[i]
                             diffOf[i] = 0.0
@@ -743,11 +750,9 @@ private fun RingDial(
                     // visible trail and tip position are identical either
                     // way — this just guarantees both directions render.
                     val start = if (arcSweepDeg >= 0f) arcStartDeg else tipDeg
-                    // Round cap: the trailing (oldest) end tapers off into a
-                    // disk the same size as the original seat dot (track
-                    // width == dot diameter) instead of a flat cut-off. The
-                    // tip end is rounded too, but the touch-marker disk
-                    // drawn below fully covers it either way.
+                    // Round cap: the trailing (oldest) end rounds off instead
+                    // of a flat cut-off. The tip end is rounded too, but the
+                    // touch-marker disk drawn below fully covers it either way.
                     drawArc(
                         brush = trailBrush,
                         startAngle = start,
