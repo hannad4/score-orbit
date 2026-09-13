@@ -72,7 +72,9 @@ import com.simplescoring.android.viewmodel.ScoreViewModel
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
+import kotlin.math.ceil
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -240,13 +242,17 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
         }
         lastAngle = Float.NaN
 
-        // Like a real rotary dial's return spring: rewind all the way back
-        // to the starting point, in the opposite direction of the drag —
-        // the full accumulated travel, not just the current lap's
-        // remainder — so every release visibly unwinds what was just spun.
+        // Like a real rotary dial's return spring: rewind opposite the
+        // spin just until the dots sit back on their start coordinates,
+        // then snap the (rotation-identical) remainder to zero. Only the
+        // visible offset ever travels — whole completed laps already sit
+        // at home, so they don't need to spin back.
         springJob?.cancel()
+        val twoPi = 2f * PI.toFloat()
         val start = accRadians
-        if (abs(start) < 0.05f) {
+        val home = if (start >= 0f) floor(start / twoPi) * twoPi
+                   else ceil(start / twoPi) * twoPi
+        if (abs(start - home) < 0.05f) {
             // Already (visually) home: nothing to unwind.
             accRadians = 0f
             activeId = null
@@ -255,13 +261,13 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             springJob = scope.launch {
                 animate(
                     initialValue = start,
-                    targetValue = 0f,
+                    targetValue = home,
                     // Slow, stately rotary return: settling time scales with
-                    // 1/sqrt(stiffness), so ~60 takes roughly 4-5x as long
-                    // as StiffnessMedium (1500) to settle.
+                    // 1/sqrt(stiffness), so ~30 takes roughly 7x as long as
+                    // StiffnessMedium (1500) to settle.
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = 60f,
+                        stiffness = 30f,
                     ),
                 ) { value, _ -> accRadians = value }
                 accRadians = 0f
@@ -310,11 +316,11 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 with(density) { 34.dp.toPx() },
                 with(density) { 64.dp.toPx() },
             )
-            // Track slightly slimmer than the dots so the ring reads as a
-            // channel the dots sit in, not a solid disk.
-            val trackWidth = (dotD * 0.9f).coerceIn(
-                with(density) { 14.dp.toPx() },
-                with(density) { 34.dp.toPx() },
+            // Track matched to the dots so the dial reads as one solid
+            // rotary wheel.
+            val trackWidth = dotD.coerceIn(
+                with(density) { 16.dp.toPx() },
+                with(density) { 36.dp.toPx() },
             )
 
             // Score boxes: rotation-proof squares, sized by player count.
