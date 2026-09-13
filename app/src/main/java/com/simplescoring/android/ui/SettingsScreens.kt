@@ -346,11 +346,18 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Select-all on focus so typing replaces the default
-                    // "Player N" text instead of appending to it. Blanked
-                    // names fall back to the stored name on blur.
+                    // Hint-style editing: untouched defaults live as an empty
+                    // box with the default as the hint, so there is never
+                    // any text to fight over — tapping just types. Custom
+                    // names still get select-all on tap (re-applied after
+                    // the tap lands, since the tap re-places the cursor
+                    // after focus and would clobber an immediate selection).
+                    // Blank always saves back to the default, so model,
+                    // box and hint can never disagree.
                     var nameField by remember(player.id) {
-                        mutableStateOf(TextFieldValue(player.name))
+                        mutableStateOf(
+                            TextFieldValue(player.name.takeUnless { it == defaultName } ?: "")
+                        )
                     }
                     val focusManager = LocalFocusManager.current
                     val scope = rememberCoroutineScope()
@@ -366,7 +373,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                         value = nameField,
                         onValueChange = {
                             nameField = it
-                            viewModel.renamePlayer(player.id, it.text)
+                            viewModel.renamePlayer(player.id, it.text.ifBlank { defaultName })
                         },
                         singleLine = true,
                         placeholder = { Text(defaultName) },
@@ -378,15 +385,9 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                             .weight(1f)
                             .onFocusChanged { focus ->
                                 if (focus.isFocused) {
-                                    if (nameField.text == defaultName) {
-                                        selectJob?.cancel()
-                                        nameField = TextFieldValue("")
-                                    } else {
-                                        // The tap that focuses the field
-                                        // re-places the cursor after focus,
-                                        // clobbering an immediate
-                                        // select-all — so select now AND
-                                        // re-select once the tap has landed.
+                                    if (nameField.text.isNotEmpty()) {
+                                        // Select now AND re-select once the
+                                        // tap has landed (see above).
                                         selectAll()
                                         selectJob?.cancel()
                                         selectJob = scope.launch {
@@ -397,7 +398,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                                 } else {
                                     selectJob?.cancel()
                                     if (nameField.text.isBlank()) {
-                                        nameField = TextFieldValue(player.name)
+                                        nameField = TextFieldValue("")
                                     }
                                 }
                             },

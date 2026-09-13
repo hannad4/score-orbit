@@ -181,10 +181,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     var pending by remember(game.id) { mutableIntStateOf(0) }
     var accRadians by remember(game.id) { mutableFloatStateOf(0f) }
     var lastAngle by remember { mutableFloatStateOf(Float.NaN) }
-    // Last committed delta, flashed as a bare number in the middle of the
-    // ring. Fades out on its own after ~2s. (The player name only ever
-    // shows in the live spin readout, never in the flash.)
-    var lastFlash by remember(game.id) { mutableStateOf<Pair<Int, Int>?>(null) }
+    // Last committed action, flashed in the middle of the ring as name +
+    // final delta, fading out on its own after ~2s.
+    var lastFlash by remember(game.id) { mutableStateOf<Triple<Int, Int, String>?>(null) }
     var flashAlpha by remember(game.id) { mutableFloatStateOf(0f) }
     var flashJob by remember(game.id) { mutableStateOf<Job?>(null) }
     // In-flight "spring back" animation that unwinds the dial after release.
@@ -225,7 +224,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             pending = 0
             if (g.keepLastVisible && player != null) {
                 flashJob?.cancel()
-                lastFlash = player.color to delta
+                lastFlash = Triple(player.color, delta, player.name)
                 flashAlpha = 1f
                 flashJob = scope.launch {
                     delay(1600)
@@ -257,12 +256,12 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 animate(
                     initialValue = start,
                     targetValue = 0f,
-                    // Slow, visible rotary return: settling time scales with
-                    // 1/sqrt(stiffness), so ~130 takes roughly 3x as long as
-                    // StiffnessMedium (1500) to settle.
+                    // Slow, stately rotary return: settling time scales with
+                    // 1/sqrt(stiffness), so ~60 takes roughly 4-5x as long
+                    // as StiffnessMedium (1500) to settle.
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = 130f,
+                        stiffness = 60f,
                     ),
                 ) { value, _ -> accRadians = value }
                 accRadians = 0f
@@ -313,9 +312,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             )
             // Track slightly slimmer than the dots so the ring reads as a
             // channel the dots sit in, not a solid disk.
-            val trackWidth = (dotD * 0.8f).coerceIn(
-                with(density) { 12.dp.toPx() },
-                with(density) { 32.dp.toPx() },
+            val trackWidth = (dotD * 0.9f).coerceIn(
+                with(density) { 14.dp.toPx() },
+                with(density) { 34.dp.toPx() },
             )
 
             // Score boxes: rotation-proof squares, sized by player count.
@@ -426,57 +425,67 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     arcSweepDeg = accRadians * 180f / PI.toFloat(),
                 )
 
-                // Center readout: while dragging, the spinning player's name
-                // plus live pending delta; once released, the committed
-                // name + delta keeps showing in the same spot until it
-                // fades (iOS "keep last visible"). Same layout throughout,
-                // so nothing blinks in and out between spin and flash.
-                // Tapping the post-commit flash opens the score history.
-                if (activeId != null) {
-                    val p = activePlayer
-                    if (p != null) {
-                        val c = Color(p.color)
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.align(Alignment.Center),
-                        ) {
+                // Center readout: one slot shared by the live spin readout
+                // and the post-commit flash, so stale text can never linger.
+                // While turning: name + live delta. On release the same
+                // name + final delta keeps showing (now fading). Empty
+                // otherwise. In particular the flash takes over the moment
+                // pending hits zero — including through the unwind, when the
+                // gesture is technically still settling.
+                val livePlayer = activePlayer
+                val flash = lastFlash
+                val showLive = livePlayer != null && (pending != 0 || flash == null)
+                if (showLive && livePlayer != null) {
+                    val c = Color(livePlayer.color)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.align(Alignment.Center),
+                    ) {
+                        Text(
+                            text = livePlayer.name,
+                            fontSize = (scoreSp * 0.32f).coerceAtLeast(12f).sp,
+                            color = c,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
+                        if (pending != 0) {
                             Text(
-                                text = p.name,
-                                fontSize = (scoreSp * 0.32f).coerceAtLeast(12f).sp,
+                                text = if (pending > 0) "+$pending" else "$pending",
+                                fontSize = (scoreSp * 1.1f).sp,
+                                fontWeight = FontWeight.Bold,
                                 color = c,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
                                 textAlign = TextAlign.Center,
                             )
-                            if (pending != 0) {
-                                Text(
-                                    text = if (pending > 0) "+$pending" else "$pending",
-                                    fontSize = (scoreSp * 1.1f).sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = c,
-                                    textAlign = TextAlign.Center,
-                                )
-                            }
                         }
                     }
-                } else {
-                    val flash = lastFlash
-                    if (activeId == null && flash != null && flashAlpha > 0f) {
-                        val (colorInt, delta) = flash
+                } else if (flash != null && flashAlpha > 0f) {
+                    val (colorInt, delta, name) = flash
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .alpha(flashAlpha)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { viewModel.go(AppScreen.ScoreHistory) },
+                            ),
+                    ) {
+                        Text(
+                            text = name,
+                            fontSize = (scoreSp * 0.32f).coerceAtLeast(12f).sp,
+                            color = Color(colorInt),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
                         Text(
                             text = if (delta > 0) "+$delta" else "$delta",
                             fontSize = (scoreSp * 1.1f).sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(colorInt),
                             textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .alpha(flashAlpha)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = { viewModel.go(AppScreen.ScoreHistory) },
-                                ),
                         )
                     }
                 }
