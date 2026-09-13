@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,6 +68,9 @@ import com.simplescoring.android.ui.theme.ScoreAnythingColors
 import com.simplescoring.android.viewmodel.AppScreen
 import com.simplescoring.android.viewmodel.ScoreViewModel
 import kotlin.math.cos
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.sin
 
 private val SheetBg = Color(0xFF1C1C1E)
@@ -335,8 +339,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
             // alone isn't reliable: the tap that focuses the field re-places
             // the cursor after focus, clobbering the selection on device.)
             val defaultName = "Player ${index + 1}"
-            Card(
-                colors = CardDefaults.cardColors(containerColor = CardBg),
+            Card(                colors = CardDefaults.cardColors(containerColor = CardBg),
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Row(
@@ -350,6 +353,15 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                         mutableStateOf(TextFieldValue(player.name))
                     }
                     val focusManager = LocalFocusManager.current
+                    val scope = rememberCoroutineScope()
+                    var selectJob by remember(player.id) { mutableStateOf<Job?>(null) }
+                    fun selectAll() {
+                        if (nameField.text.isNotEmpty()) {
+                            nameField = nameField.copy(
+                                selection = TextRange(0, nameField.text.length)
+                            )
+                        }
+                    }
                     OutlinedTextField(
                         value = nameField,
                         onValueChange = {
@@ -367,14 +379,26 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                             .onFocusChanged { focus ->
                                 if (focus.isFocused) {
                                     if (nameField.text == defaultName) {
+                                        selectJob?.cancel()
                                         nameField = TextFieldValue("")
                                     } else {
-                                        nameField = nameField.copy(
-                                            selection = TextRange(0, nameField.text.length)
-                                        )
+                                        // The tap that focuses the field
+                                        // re-places the cursor after focus,
+                                        // clobbering an immediate
+                                        // select-all — so select now AND
+                                        // re-select once the tap has landed.
+                                        selectAll()
+                                        selectJob?.cancel()
+                                        selectJob = scope.launch {
+                                            delay(150)
+                                            selectAll()
+                                        }
                                     }
-                                } else if (nameField.text.isBlank()) {
-                                    nameField = TextFieldValue(player.name)
+                                } else {
+                                    selectJob?.cancel()
+                                    if (nameField.text.isBlank()) {
+                                        nameField = TextFieldValue(player.name)
+                                    }
                                 }
                             },
                         colors = OutlinedTextFieldDefaults.colors(

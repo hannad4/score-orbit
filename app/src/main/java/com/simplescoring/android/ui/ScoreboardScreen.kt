@@ -181,9 +181,10 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     var pending by remember(game.id) { mutableIntStateOf(0) }
     var accRadians by remember(game.id) { mutableFloatStateOf(0f) }
     var lastAngle by remember { mutableFloatStateOf(Float.NaN) }
-    // Last committed action, flashed in the middle of the ring: color,
-    // delta and player name. Fades out on its own after ~2s.
-    var lastFlash by remember(game.id) { mutableStateOf<Triple<Int, Int, String>?>(null) }
+    // Last committed delta, flashed as a bare number in the middle of the
+    // ring. Fades out on its own after ~2s. (The player name only ever
+    // shows in the live spin readout, never in the flash.)
+    var lastFlash by remember(game.id) { mutableStateOf<Pair<Int, Int>?>(null) }
     var flashAlpha by remember(game.id) { mutableFloatStateOf(0f) }
     var flashJob by remember(game.id) { mutableStateOf<Job?>(null) }
     // In-flight "spring back" animation that unwinds the dial after release.
@@ -224,7 +225,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             pending = 0
             if (g.keepLastVisible && player != null) {
                 flashJob?.cancel()
-                lastFlash = Triple(player.color, delta, player.name)
+                lastFlash = player.color to delta
                 flashAlpha = 1f
                 flashJob = scope.launch {
                     delay(1600)
@@ -240,26 +241,22 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
         }
         lastAngle = Float.NaN
 
-        // Like a real rotary dial's return spring: unwind back to rest
-        // instead of snapping instantly. Always the LONG way home — carry
-        // on past rest to the equivalent +/-2pi instead of reversing — so
-        // every release gets the same grand unwind no matter the player,
-        // direction, or lap count. Whole laps beyond the remainder look
-        // identical once wrapped, so they don't need to travel.
+        // Like a real rotary dial's return spring: rewind all the way back
+        // to the starting point, in the opposite direction of the drag —
+        // the full accumulated travel, not just the current lap's
+        // remainder — so every release visibly unwinds what was just spun.
         springJob?.cancel()
-        val r = accRadians % (2f * PI.toFloat())
-        if (abs(r) < 0.05f) {
+        val start = accRadians
+        if (abs(start) < 0.05f) {
             // Already (visually) home: nothing to unwind.
             accRadians = 0f
             activeId = null
             springJob = null
         } else {
-            val target = if (r > 0f) 2f * PI.toFloat() else -2f * PI.toFloat()
-            accRadians = r
             springJob = scope.launch {
                 animate(
-                    initialValue = r,
-                    targetValue = target,
+                    initialValue = start,
+                    targetValue = 0f,
                     // Slow, visible rotary return: settling time scales with
                     // 1/sqrt(stiffness), so ~130 takes roughly 3x as long as
                     // StiffnessMedium (1500) to settle.
@@ -465,9 +462,13 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 } else {
                     val flash = lastFlash
                     if (activeId == null && flash != null && flashAlpha > 0f) {
-                        val (colorInt, delta, name) = flash
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
+                        val (colorInt, delta) = flash
+                        Text(
+                            text = if (delta > 0) "+$delta" else "$delta",
+                            fontSize = (scoreSp * 1.1f).sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(colorInt),
+                            textAlign = TextAlign.Center,
                             modifier = Modifier
                                 .align(Alignment.Center)
                                 .alpha(flashAlpha)
@@ -476,23 +477,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                     indication = null,
                                     onClick = { viewModel.go(AppScreen.ScoreHistory) },
                                 ),
-                        ) {
-                            Text(
-                                text = name,
-                                fontSize = (scoreSp * 0.32f).coerceAtLeast(12f).sp,
-                                color = Color(colorInt),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = TextAlign.Center,
-                            )
-                            Text(
-                                text = if (delta > 0) "+$delta" else "$delta",
-                                fontSize = (scoreSp * 1.1f).sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(colorInt),
-                                textAlign = TextAlign.Center,
-                            )
-                        }
+                        )
                     }
                 }
 
