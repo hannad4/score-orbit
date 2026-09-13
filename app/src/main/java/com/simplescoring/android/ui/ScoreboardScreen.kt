@@ -12,28 +12,25 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -173,6 +170,7 @@ private fun rayToEdge(center: Offset, dir: Offset, w: Float, h: Float, margin: F
     return if (t.isFinite()) t.coerceAtLeast(0f) else 0f
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     val ctx = LocalContext.current
@@ -277,26 +275,58 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-    ) {
-        // Minimal top bar like iOS: list left, gear right.
-        Row(
-            modifier = Modifier.height(52.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        game.name,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = { viewModel.go(AppScreen.ScoreHistory) }) {
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Score history")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.go(AppScreen.Settings) }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                },
+            )
+        },
+        bottomBar = {
+            BottomAppBar(
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.undo() },
+                        enabled = viewModel.undoStack.isNotEmpty(),
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+                    }
+                    IconButton(
+                        onClick = { viewModel.redo() },
+                        enabled = viewModel.redoStack.isNotEmpty(),
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
+                    }
+                },
+                floatingActionButton = {
+                    FloatingActionButton(onClick = { viewModel.finishGame() }) {
+                        Icon(Icons.Default.Check, contentDescription = "Finish game")
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
         ) {
-            IconButton(onClick = { viewModel.go(AppScreen.ScoreHistory) }) {
-                Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Score history", tint = Color.White.copy(alpha = 0.85f))
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            IconButton(onClick = { viewModel.go(AppScreen.Settings) }) {
-                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White.copy(alpha = 0.85f))
-            }
-        }
-
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val density = LocalDensity.current
             val wPx = with(density) { maxWidth.toPx() }
             val hPx = with(density) { maxHeight.toPx() }
@@ -420,6 +450,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     cyPx = cy,
                     ringRPx = ringR,
                     trackPx = trackWidth,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     activeColor = activePlayer?.let { Color(it.color) },
                     // Arc trails from the player's dot along the drag. Not
                     // clamped to one lap: RingDial itself turns anything
@@ -706,31 +737,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 }
             }
         }
-
-        // Undo/redo row like the score history page.
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp, horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-        ) {
-            FilledTonalButton(
-                enabled = viewModel.undoStack.isNotEmpty(),
-                onClick = { viewModel.undo() },
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Undo")
-            }
-            FilledTonalButton(
-                enabled = viewModel.redoStack.isNotEmpty(),
-                onClick = { viewModel.redo() },
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Redo")
-            }
-        }
     }
 }
 
@@ -744,6 +750,7 @@ private fun RingDial(
     cyPx: Float,
     ringRPx: Float,
     trackPx: Float,
+    trackColor: Color,
     activeColor: Color?,
     arcStartDeg: Float,
     arcSweepDeg: Float,
@@ -762,7 +769,7 @@ private fun RingDial(
     ) {
         val center = Offset(size.width / 2f, size.height / 2f)
         drawCircle(
-            color = Color(0xFF262626),
+            color = trackColor,
             radius = ringRPx,
             center = center,
             style = Stroke(width = trackPx),

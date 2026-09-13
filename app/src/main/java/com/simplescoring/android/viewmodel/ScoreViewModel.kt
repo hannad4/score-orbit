@@ -186,6 +186,10 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         _currentGame.value = _currentGame.value?.copy(step = step.coerceIn(1, 100))
     }
 
+    fun setWinMetric(metric: WinMetric) {
+        _currentGame.value = _currentGame.value?.copy(winMetric = metric)
+    }
+
     fun setKeepLastVisible(keep: Boolean) {
         _currentGame.value = _currentGame.value?.copy(keepLastVisible = keep)
     }

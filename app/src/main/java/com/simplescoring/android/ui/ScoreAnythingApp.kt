@@ -1,15 +1,20 @@
 package com.simplescoring.android.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import com.simplescoring.android.ui.theme.ExpressiveMotion
 import com.simplescoring.android.viewmodel.AppScreen
 import com.simplescoring.android.viewmodel.ScoreViewModel
 
@@ -32,28 +37,41 @@ fun ScoreAnythingApp(viewModel: ScoreViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
-            .statusBarsPadding()
-            .navigationBarsPadding()
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        when (screen) {
-            AppScreen.Board -> {
-                val g = game
-                if (g != null) ScoreboardScreen(game = g, viewModel = viewModel)
-                else GameHistoryScreen(history = history, currentGame = null, viewModel = viewModel)
+        AnimatedContent(
+            targetState = screen,
+            transitionSpec = {
+                (fadeIn(animationSpec = ExpressiveMotion.contentTween(350)) +
+                    scaleIn(
+                        initialScale = 0.96f,
+                        animationSpec = ExpressiveMotion.contentTween(350),
+                    )) togetherWith
+                    fadeOut(animationSpec = ExpressiveMotion.contentTween(200))
+            },
+            label = "screen",
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopStart,
+        ) { target ->
+            when (target) {
+                AppScreen.Board -> {
+                    val g = game
+                    if (g != null) ScoreboardScreen(game = g, viewModel = viewModel)
+                    else GameHistoryScreen(history = history, currentGame = null, viewModel = viewModel)
+                }
+                AppScreen.Settings -> SettingsScreen(game = game, viewModel = viewModel)
+                AppScreen.PlayerSetup -> {
+                    val g = game
+                    if (g != null) PlayerSetupScreen(game = g, viewModel = viewModel)
+                    else SettingsScreen(game = null, viewModel = viewModel)
+                }
+                AppScreen.ScoreHistory -> {
+                    val g = game
+                    if (g != null) ScoreHistoryScreen(game = g, viewModel = viewModel)
+                    else GameHistoryScreen(history = history, currentGame = null, viewModel = viewModel)
+                }
+                AppScreen.GameHistory -> GameHistoryScreen(history = history, currentGame = game, viewModel = viewModel)
             }
-            AppScreen.Settings -> SettingsScreen(game = game, viewModel = viewModel)
-            AppScreen.PlayerSetup -> {
-                val g = game
-                if (g != null) PlayerSetupScreen(game = g, viewModel = viewModel)
-                else SettingsScreen(game = null, viewModel = viewModel)
-            }
-            AppScreen.ScoreHistory -> {
-                val g = game
-                if (g != null) ScoreHistoryScreen(game = g, viewModel = viewModel)
-                else GameHistoryScreen(history = history, currentGame = null, viewModel = viewModel)
-            }
-            AppScreen.GameHistory -> GameHistoryScreen(history = history, currentGame = game, viewModel = viewModel)
         }
     }
 }

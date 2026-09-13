@@ -2,13 +2,20 @@ package com.simplescoring.android.ui.theme
 
 import android.app.Activity
 import android.os.Build
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
@@ -25,6 +32,35 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = ScoreAnythingColors.SurfaceDark,
     onSurfaceVariant = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f),
 )
+
+/**
+ * M3 Expressive shape family: rounder and more playful than baseline —
+ * cards, dialogs and sheets pick these up automatically.
+ */
+private val ExpressiveShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(32.dp),
+)
+
+/**
+ * Shared expressive motion: springy, bouncy, playful. Screen transitions
+ * and list entrances all draw from here so the whole app moves as one.
+ */
+object ExpressiveMotion {
+    /** Emphasized ease for 300-500ms content transitions. */
+    val EmphasizedEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+
+    fun contentTween(durationMillis: Int = 350) =
+        tween<Float>(durationMillis, easing = EmphasizedEasing)
+
+    fun <T> contentSpring() = spring<T>(
+        dampingRatio = Spring.DampingRatioMediumBouncy,
+        stiffness = Spring.StiffnessMediumLow,
+    )
+}
 
 @Composable
 fun ScoreAnythingTheme(
@@ -57,6 +93,7 @@ fun ScoreAnythingTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = ExpressiveShapes,
         content = content
     )
 }
