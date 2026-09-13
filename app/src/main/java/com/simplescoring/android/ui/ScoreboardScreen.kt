@@ -3,6 +3,7 @@ package com.simplescoring.android.ui
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -76,6 +77,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Points scored by one full turn of the ring, scaled by the score step. */
@@ -179,8 +181,11 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     var pending by remember(game.id) { mutableIntStateOf(0) }
     var accRadians by remember(game.id) { mutableFloatStateOf(0f) }
     var lastAngle by remember { mutableFloatStateOf(Float.NaN) }
-    // Last committed delta, flashed in the middle of the ring (iOS behavior).
-    var lastCommit by remember(game.id) { mutableStateOf<Pair<Int, Int>?>(null) }
+    // Last committed action, flashed in the middle of the ring: color,
+    // delta and player name. Fades out on its own after ~2s.
+    var lastFlash by remember(game.id) { mutableStateOf<Triple<Int, Int, String>?>(null) }
+    var flashAlpha by remember(game.id) { mutableFloatStateOf(0f) }
+    var flashJob by remember(game.id) { mutableStateOf<Job?>(null) }
     // In-flight "spring back" animation that unwinds the dial after release.
     val scope = rememberCoroutineScope()
     var springJob by remember(game.id) { mutableStateOf<Job?>(null) }
@@ -192,6 +197,10 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     fun resetGesture() {
         springJob?.cancel()
         springJob = null
+        flashJob?.cancel()
+        flashJob = null
+        lastFlash = null
+        flashAlpha = 0f
         activeId = null
         pending = 0
         accRadians = 0f
@@ -204,11 +213,30 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
         // time), never plain vals captured from an old composition.
         val id = activeId
         val delta = pending
-        val keepLast = latestGame.keepLastVisible
-        val color = latestGame.players.firstOrNull { it.id == id }?.color
+        val g = latestGame
+        val player = g.players.firstOrNull { it.id == id }
         if (id != null && delta != 0) {
             viewModel.addScore(id, delta)
-            if (keepLast && color != null) lastCommit = color to delta
+            // Totals are committed: drop the live readout immediately so the
+            // center switches to the flash instead of showing stale pending
+            // through the unwind. activeId stays until the spring settles so
+            // the dots/trail keep animating back in place.
+            pending = 0
+            if (g.keepLastVisible && player != null) {
+                flashJob?.cancel()
+                lastFlash = Triple(player.color, delta, player.name)
+                flashAlpha = 1f
+                flashJob = scope.launch {
+                    delay(1600)
+                    animate(
+                        initialValue = 1f,
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 400),
+                    ) { value, _ -> flashAlpha = value }
+                    lastFlash = null
+                    flashJob = null
+                }
+            }
         }
         lastAngle = Float.NaN
 
@@ -216,15 +244,17 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
         // instead of snapping instantly. Only the current lap's remainder
         // needs to travel — whole laps beyond that look identical once
         // wrapped, so animating the full accumulated distance would just
-        // spin needlessly. activeId/pending stay put until the spring
-        // settles, so the dots, trail and marker keep animating back in
-        // place instead of vanishing immediately.
+        // spin needlessly. The remainder is wrapped to the shortest path
+        // (<= half a turn) so the return travels the same distance and
+        // duration no matter which player, direction, or lap count.
         springJob?.cancel()
-        val remainder = accRadians % (2f * PI.toFloat())
-        accRadians = remainder
+        var r = accRadians % (2f * PI.toFloat())
+        if (r > PI.toFloat()) r -= 2f * PI.toFloat()
+        else if (r < -PI.toFloat()) r += 2f * PI.toFloat()
+        accRadians = r
         springJob = scope.launch {
             animate(
-                initialValue = remainder,
+                initialValue = r,
                 targetValue = 0f,
                 // Slow, visible rotary return (~1s): settling time scales
                 // with 1/sqrt(stiffness), so ~130 takes roughly 3x as long
@@ -236,7 +266,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             ) { value, _ -> accRadians = value }
             accRadians = 0f
             activeId = null
-            pending = 0
             springJob = null
         }
     }
@@ -273,8 +302,8 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             val minDim = min(wPx, hPx)
             fun dp(px: Float): Dp = with(density) { px.toDp() }
 
-            // Ring sized like iOS (~0.30 of the narrow side); dots sit on it.
-            val ringR = minDim * 0.30f
+            // Ring sized like iOS; dots sit on it.
+            val ringR = minDim * 0.32f
             val share = (2 * PI.toFloat() * ringR / n) * 0.68f
             val dotD = share.coerceIn(
                 with(density) { 34.dp.toPx() },
@@ -336,7 +365,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 resetGesture()
                                 val seat = nearestSeat(offset, center, g.players.size)
                                 activeId = g.players[seat].id
-                                lastCommit = null
                                 lastAngle = atan2(
                                     (offset.y - cy).toDouble(),
                                     (offset.x - cx).toDouble()
@@ -415,23 +443,36 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         )
                     }
                 } else {
-                    val flash = lastCommit
-                    if (activeId == null && flash != null) {
-                        val (colorInt, delta) = flash
-                        Text(
-                            text = if (delta > 0) "+$delta" else "$delta",
-                            fontSize = (scoreSp * 1.1f).sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(colorInt),
-                            textAlign = TextAlign.Center,
+                    val flash = lastFlash
+                    if (activeId == null && flash != null && flashAlpha > 0f) {
+                        val (colorInt, delta, name) = flash
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
                                 .align(Alignment.Center)
+                                .alpha(flashAlpha)
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
                                     onClick = { viewModel.go(AppScreen.ScoreHistory) },
                                 ),
-                        )
+                        ) {
+                            Text(
+                                text = name,
+                                fontSize = (scoreSp * 0.32f).coerceAtLeast(12f).sp,
+                                color = Color(colorInt),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                            )
+                            Text(
+                                text = if (delta > 0) "+$delta" else "$delta",
+                                fontSize = (scoreSp * 1.1f).sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(colorInt),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 }
 
