@@ -78,7 +78,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
                 id = UUID.randomUUID().toString(),
                 name = names.getOrElse(i) { "Player ${i + 1}" }.ifBlank { "Player ${i + 1}" },
                 color = colors.getOrElse(i) { ScoreAnythingColors.PlayerColors[i % ScoreAnythingColors.PlayerColors.size] },
-                rotation = RotationUtils.defaultForPosition(i, count),
+                rotation = Rotation.NONE,
             )
         }
         _currentGame.value = Game(
@@ -199,7 +199,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
                 Player(
                     name = "Player ${i + 1}",
                     color = nextFreeColor(game.players.map { it.color }, i),
-                    rotation = RotationUtils.defaultForPosition(i, target),
+                    rotation = Rotation.NONE,
                 )
             }
         }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -21,6 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -70,9 +73,19 @@ import kotlin.math.sin
 /** Points scored by one full turn of the ring, scaled by the score step. */
 private fun turnValue(step: Int) = 10 * step.coerceAtLeast(1)
 
-/** Seat angle in radians for [index] of [total] (seat 0 at top, clockwise, y-down). */
-private fun seatAngle(index: Int, total: Int): Double =
-    (-90.0 + index * 360.0 / total) * PI / 180.0
+/**
+ * Seat angle in radians for [index] of [total] (clockwise, y-down). Seat 0
+ * sits at the top by default. Only a [total] that's a multiple of 4 always
+ * lands a seat exactly at due east/west (90°/270°) — the tightest, most
+ * ambiguous spot against the screen edge — so only those counts rotate the
+ * whole ring back by half a seat's spacing (-π/total), landing seat 0
+ * top-left instead of dead top. Other counts (even or odd) never hit that
+ * exact side extremum, so they keep the plain top start.
+ */
+private fun seatAngle(index: Int, total: Int): Double {
+    val origin = if (total >= 4 && total % 4 == 0) -PI / 2 - PI / total else -PI / 2
+    return origin + index * 2.0 * PI / total
+}
 
 private fun nearestSeat(point: Offset, center: Offset, total: Int): Int {
     val a = atan2((point.y - center.y).toDouble(), (point.x - center.x).toDouble())
@@ -89,15 +102,49 @@ private fun nearestSeat(point: Offset, center: Offset, total: Int): Int {
     return best
 }
 
-/** Find nearest anchor (non-side) player index to [i]. */
-private fun findNearestAnchor(i: Int, n: Int, sideThreshold: Float, positions: Array<Offset?>): Int {
+/**
+ * Find nearest anchor (non-side) seat index to [i], searching both
+ * directions. Only considers anchors in the same top/bottom half as [i]
+ * ([topHalf]) so a bottom-dwelling seat never gets pulled up to stack near a
+ * top anchor (or vice versa) just because it's the closest one by index.
+ */
+private fun findNearestAnchor(i: Int, n: Int, isSide: BooleanArray, topHalf: BooleanArray): Int {
     for (offset in 1..n / 2) {
         val cw = (i + offset) % n
         val ccw = (i - offset + n) % n
-        if (positions[cw] != null) return cw
-        if (positions[ccw] != null) return ccw
+        if (!isSide[cw] && topHalf[cw] == topHalf[i]) return cw
+        if (!isSide[ccw] && topHalf[ccw] == topHalf[i]) return ccw
     }
     return -1
+}
+
+/**
+ * Hand-placed label angles (degrees; 0 = screen right, 90 = down, matching
+ * [seatAngle]'s convention) for [n] players, one per player index in order.
+ * Used for 4-6 players only (7+ uses the top/bottom half layout instead —
+ * see the ScoreboardScreen composable): with only 6 "roomy" compass spots
+ * that don't crowd the central dial (the 4 diagonals plus straight up/down
+ * — due left/right is always too tight against the ring on a phone), this
+ * fills those spots first. Player dots on the ring stay evenly spaced
+ * regardless — only the score labels use this layout — but the walk around
+ * the 6 spots starts at whichever one seat 0's dot actually sits on, so a
+ * label always lines up with its own dot: top-left for a multiple of 4 (see
+ * [seatAngle]'s half-step shift), straight up otherwise.
+ */
+private fun manualLabelAngles(n: Int): List<Double>? {
+    // Depth (0 or 1) of each of the 6 roomy compass slots, in fixed order
+    // [N, NE, SE, S, SW, NW].
+    val depths = when (n) {
+        4 -> intArrayOf(0, 1, 1, 0, 1, 1)
+        5 -> intArrayOf(1, 1, 1, 0, 1, 1)
+        6 -> intArrayOf(1, 1, 1, 1, 1, 1)
+        else -> return null
+    }
+    val slotAngle = doubleArrayOf(-90.0, -45.0, 45.0, 90.0, 135.0, -135.0) // N, NE, SE, S, SW, NW
+    val order = if (n % 4 == 0) intArrayOf(5, 0, 1, 2, 3, 4) else intArrayOf(0, 1, 2, 3, 4, 5)
+    val result = mutableListOf<Double>()
+    for (slot in order) if (depths[slot] >= 1) result += slotAngle[slot]
+    return result
 }
 
 /**
@@ -196,15 +243,39 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             val trackWidth = dotD
 
             // Score boxes: rotation-proof squares, sized by player count.
+            // 4-6 players sit at diagonal corners (see manualLabelAngles),
+            // which eat into both screen dimensions at once — a smaller box
+            // than the old n<=4 tier leaves real breathing room between the
+            // box and the ring instead of pinning it right to the screen
+            // edge with almost no gap. 7+ players lay a crowded half of the
+            // wheel out as side-by-side columns (see the halfLayout below)
+            // instead, which needs the box to actually shrink as the widest
+            // half grows, or neighboring columns start to overlap. Rather
+            // than guess a static size per count, size it directly from the
+            // real screen width so it's as large as it can be while still
+            // leaving a small gap between columns.
+            val edgeMarginPx = with(density) { 8.dp.toPx() }
             val labelBoxPx = when {
                 n <= 3 -> with(density) { 140.dp.toPx() }
-                n <= 4 -> with(density) { 124.dp.toPx() }
                 n <= 6 -> with(density) { 100.dp.toPx() }
-                n <= 9 -> with(density) { 84.dp.toPx() }
-                else -> with(density) { 72.dp.toPx() }
+                else -> {
+                    val maxHalfK = (0 until n).groupBy { sin(seatAngle(it, n)) <= 0.0 }.values.maxOf { it.size }
+                    if (maxHalfK < 4) {
+                        with(density) { 100.dp.toPx() }
+                    } else {
+                        val usableWidth = wPx - 2 * edgeMarginPx
+                        val gap = with(density) { 4.dp.toPx() }
+                        // 4 columns (7-8 players) comfortably fits a 95dp
+                        // floor on a typical phone; 5-6 columns (9-12
+                        // players) can't without overlapping, so they stay
+                        // governed purely by the width-fit computation.
+                        val floor = with(density) { if (maxHalfK <= 4) 95.dp.toPx() else 56.dp.toPx() }
+                        ((usableWidth - gap * (maxHalfK - 1)) / maxHalfK)
+                            .coerceIn(floor, with(density) { 100.dp.toPx() })
+                    }
+                }
             }
             val scoreSp = (labelBoxPx * 0.44f / density.density).coerceIn(20f, 64f)
-            val edgeMarginPx = with(density) { 8.dp.toPx() }
 
             Box(
                 modifier = Modifier
@@ -304,90 +375,162 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     )
                 }
 
-                // Scores pushed out to the screen edges along each seat ray.
-                // Side players (near 90°/270°) stack vertically near anchors
-                // instead of rotating and overlapping the central UI.
-                val sideThreshold = 0.7f // |cos(angle)| below this = side player
-
-                // Pre-compute label positions for anchor players.
+                // Scores pushed out to the screen edges. 1-3 players use the
+                // seatAngle-driven layout below (anchors at their natural
+                // rotary start point; side players stack off a same-half
+                // anchor, or off their own ring-edge spot when there isn't
+                // one). 4-6 players use the hand-placed compass layout from
+                // manualLabelAngles. 7+ players split into top/bottom halves
+                // (by each seat's own vertical direction) and, per half:
+                // fewer than 4 players still anchor along their own ray, same
+                // as 1-3 players; 4 or more spread out as evenly spaced
+                // columns across the screen — in the seats' left-to-right
+                // order, alternating a near row (just past the ring) and a
+                // far row (screen edge) — since a half that crowded usually
+                // has no natural anchor left to stack from.
                 val labelPositions = Array(n) { null as Offset? }
-                for (i in 0 until n) {
-                    val a = seatAngle(i, n)
-                    val dirX = cos(a).toFloat()
-                    val dirY = sin(a).toFloat()
-                    if (abs(dirX) >= sideThreshold) {
+                val stackOffset = labelBoxPx + with(density) { 8.dp.toPx() }
+                val manualAngles = manualLabelAngles(n)
+                if (n >= 7) {
+                    val nearD = ringR + dotD / 2f + with(density) { 8.dp.toPx() }
+                    val farD = nearD + stackOffset
+                    val xMin = edgeMarginPx + labelBoxPx / 2f
+                    val xMax = wPx - edgeMarginPx - labelBoxPx / 2f
+                    for (top in booleanArrayOf(true, false)) {
+                        val half = (0 until n).filter { (sin(seatAngle(it, n)) <= 0.0) == top }
+                        if (half.size < 4) {
+                            for (i in half) {
+                                val a = seatAngle(i, n)
+                                val dirX = cos(a).toFloat()
+                                val dirY = sin(a).toFloat()
+                                val maxDist = rayToEdge(center, Offset(dirX, dirY), wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
+                                val dist = min(1.85f * ringR, maxDist).coerceAtLeast(nearD)
+                                labelPositions[i] = Offset(cx + dirX * dist, cy + dirY * dist)
+                            }
+                        } else {
+                            val ordered = half.sortedBy { cos(seatAngle(it, n)) }
+                            val k = ordered.size
+                            // Outer seats (by left-to-right order) sit in the
+                            // near row, inner ones in the far row for 4 (an
+                            // inverted "smile" — on review this read better
+                            // than outer-far); a strict zigzag from 5 up.
+                            val isFar = when (k) {
+                                4 -> booleanArrayOf(false, true, true, false)
+                                5 -> booleanArrayOf(true, false, true, false, true)
+                                else -> BooleanArray(k) { it % 2 == 0 }
+                            }
+                            val sign = if (top) -1f else 1f
+                            // Both rows push out an extra half box-height from
+                            // the centerline, so a fully split board (4+ on
+                            // both halves) doesn't read as one crowded band
+                            // straddling the middle of the screen.
+                            val centerlineClearance = labelBoxPx / 2f
+                            ordered.forEachIndexed { j, i ->
+                                val x = xMin + j * (xMax - xMin) / (k - 1)
+                                val d = (if (isFar[j]) farD else nearD) + centerlineClearance
+                                labelPositions[i] = Offset(x, cy + sign * d)
+                            }
+                        }
+                    }
+                } else if (manualAngles != null) {
+                    val used = HashMap<Double, Int>()
+                    for (i in 0 until n) {
+                        val angleDeg = manualAngles[i]
+                        val a = angleDeg * PI / 180.0
+                        val dirX = cos(a).toFloat()
+                        val dirY = sin(a).toFloat()
                         val maxDist = rayToEdge(center, Offset(dirX, dirY), wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
                         val dist = min(1.85f * ringR, maxDist)
                             .coerceAtLeast(ringR + dotD / 2f + with(density) { 8.dp.toPx() })
-                        labelPositions[i] = Offset(cx + dirX * dist, cy + dirY * dist)
+                        val occurrence = used.getOrDefault(angleDeg, 0)
+                        used[angleDeg] = occurrence + 1
+                        // coerceAtMost keeps a doubled-up slot's outer occupant
+                        // from being pushed past the screen edge.
+                        val finalDist = (dist + stackOffset * occurrence).coerceAtMost(maxDist)
+                        labelPositions[i] = Offset(cx + dirX * finalDist, cy + dirY * finalDist)
                     }
-                }
+                } else {
+                    // Anchors (valid, non-side positions) stay put on their
+                    // natural rotary start point. Side players — those whose
+                    // horizontal component |cos(theta)| clears the threshold,
+                    // i.e. living on the left/right of the wheel — stack
+                    // above/below their nearest anchor instead of overlapping
+                    // the central UI.
+                    val sideThreshold = cos(40 * PI / 180).toFloat() // |cos(angle)| above this = side player
+                    val isSide = BooleanArray(n) { abs(cos(seatAngle(it, n)).toFloat()) >= sideThreshold }
+                    // Which half of the wheel a seat's own position falls in
+                    // — a side player stacks within its own half, never the
+                    // other.
+                    val topHalf = BooleanArray(n) { sin(seatAngle(it, n)) <= 0.0 }
 
-                // For each side player, find nearest anchor and stack vertically.
-                val stackOffset = labelBoxPx + with(density) { 8.dp.toPx() }
-                for (i in 0 until n) {
-                    val a = seatAngle(i, n)
-                    val dirX = cos(a).toFloat()
-                    if (abs(dirX) >= sideThreshold) continue // anchor, already placed
-
-                    // Find nearest anchor.
-                    var anchorIdx = -1
-                    var anchorDist = n + 1
-                    for (offset in 1..n / 2) {
-                        val cw = (i + offset) % n
-                        val ccw = (i - offset + n) % n
-                        if (labelPositions[cw] != null && offset < anchorDist) {
-                            anchorIdx = cw
-                            anchorDist = offset
-                        }
-                        if (labelPositions[ccw] != null && offset < anchorDist) {
-                            anchorIdx = ccw
-                            anchorDist = offset
-                        }
-                    }
-
-                    if (anchorIdx < 0) {
-                        // No anchor found (all players are side players); fall back to edge.
+                    // Place anchors (non-side players) at their natural positions.
+                    for (i in 0 until n) {
+                        if (isSide[i]) continue
+                        val a = seatAngle(i, n)
+                        val dirX = cos(a).toFloat()
                         val dirY = sin(a).toFloat()
                         val maxDist = rayToEdge(center, Offset(dirX, dirY), wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
                         val dist = min(1.85f * ringR, maxDist)
                             .coerceAtLeast(ringR + dotD / 2f + with(density) { 8.dp.toPx() })
                         labelPositions[i] = Offset(cx + dirX * dist, cy + dirY * dist)
-                        continue
                     }
 
-                    val anchorPos = labelPositions[anchorIdx]!!
-                    val anchorAngle = seatAngle(anchorIdx, n)
-
-                    // Determine above/below based on angular position.
-                    var angleDiff = a - anchorAngle
-                    while (angleDiff > PI) angleDiff -= 2 * PI
-                    while (angleDiff < -PI) angleDiff += 2 * PI
-                    val above = angleDiff < 0
-
-                    // Count how many side players are already stacked here.
-                    var stackCount = 0
-                    for (j in 0 until n) {
-                        if (j == i) continue
-                        val jAngle = seatAngle(j, n)
-                        val jDirX = cos(jAngle).toFloat()
-                        if (abs(jDirX) >= sideThreshold) continue
-                        val jAnchor = findNearestAnchor(j, n, sideThreshold, labelPositions)
-                        if (jAnchor == anchorIdx) {
-                            var jDiff = jAngle - anchorAngle
-                            while (jDiff > PI) jDiff -= 2 * PI
-                            while (jDiff < -PI) jDiff += 2 * PI
-                            val jAbove = jDiff < 0
-                            if (jAbove == above) stackCount++
+                    // For each side player, resolve the point it stacks from and
+                    // whether it belongs above or below that point. This only
+                    // looks at true anchors (isSide == false) in the same half
+                    // of the wheel, never at other side players or the opposite
+                    // half, so the result doesn't depend on processing order and
+                    // a bottom-half player never gets thrown to the top.
+                    val anchorPosOf = arrayOfNulls<Offset>(n)
+                    val aboveOf = BooleanArray(n)
+                    val diffOf = DoubleArray(n)
+                    for (i in 0 until n) {
+                        if (!isSide[i]) continue
+                        val a = seatAngle(i, n)
+                        val dirX = cos(a).toFloat()
+                        val dirY = sin(a).toFloat()
+                        val anchorIdx = findNearestAnchor(i, n, isSide, topHalf)
+                        if (anchorIdx < 0) {
+                            // No anchor in this half of the wheel; stack out from
+                            // the seat's own ring-edge position instead of
+                            // reaching across to an anchor on the other half.
+                            val maxDist = rayToEdge(center, Offset(dirX, dirY), wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
+                            val dist = min(1.85f * ringR, maxDist)
+                                .coerceAtLeast(ringR + dotD / 2f + with(density) { 8.dp.toPx() })
+                            anchorPosOf[i] = Offset(cx + dirX * dist, cy + dirY * dist)
+                            aboveOf[i] = topHalf[i]
+                            diffOf[i] = 0.0
+                            continue
                         }
+                        val anchorAngle = seatAngle(anchorIdx, n)
+                        var angleDiff = a - anchorAngle
+                        while (angleDiff > PI) angleDiff -= 2 * PI
+                        while (angleDiff < -PI) angleDiff += 2 * PI
+                        val onRightSide = dirX > 0
+                        anchorPosOf[i] = labelPositions[anchorIdx]
+                        aboveOf[i] = if (onRightSide) angleDiff > 0 else angleDiff < 0
+                        diffOf[i] = abs(angleDiff)
                     }
 
-                    // Offset by stack count to avoid overlap.
-                    val totalOffset = stackOffset * (stackCount + 1)
-                    labelPositions[i] = Offset(
-                        anchorPos.x,
-                        if (above) anchorPos.y - totalOffset else anchorPos.y + totalOffset
-                    )
+                    // Stack each side player above/below its reference point,
+                    // ranked by angular closeness so players sharing a reference
+                    // point + direction land at increasing distances instead of
+                    // on top of each other — always at least one full step out,
+                    // so even a lone side player clears the central dial.
+                    for (i in 0 until n) {
+                        if (!isSide[i]) continue
+                        val anchorPos = anchorPosOf[i] ?: continue
+                        var rank = 1
+                        for (j in 0 until n) {
+                            if (j == i || !isSide[j] || anchorPosOf[j] != anchorPos || aboveOf[j] != aboveOf[i]) continue
+                            if (diffOf[j] < diffOf[i] || (diffOf[j] == diffOf[i] && j < i)) rank++
+                        }
+                        val totalOffset = stackOffset * rank
+                        labelPositions[i] = Offset(
+                            anchorPos.x,
+                            if (aboveOf[i]) anchorPos.y - totalOffset else anchorPos.y + totalOffset
+                        )
+                    }
                 }
 
                 // Render all labels.
