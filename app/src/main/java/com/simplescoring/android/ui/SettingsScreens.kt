@@ -22,22 +22,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -73,9 +72,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.sin
 
-private val SheetBg = Color(0xFF1C1C1E)
-private val CardBg = Color(0xFF2C2C2E)
-private val iOSBlue = Color(0xFF0A84FF)
 
 /** iOS-style Settings sheet (see App Store screenshot 4). */
 @Composable
@@ -85,7 +81,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(SheetBg)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -96,41 +92,33 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                 "Settings",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.align(Alignment.Center),
             )
             IconButton(
                 onClick = { viewModel.go(AppScreen.Board) },
                 modifier = Modifier.align(Alignment.CenterEnd).size(32.dp),
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White.copy(alpha = 0.7f))
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
         if (game != null) {
             SectionLabel("SCOREBOARD")
             Card(
-                colors = CardDefaults.cardColors(containerColor = CardBg),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
-                    OutlinedTextField(
+                    TextField(
                         value = game.name,
                         onValueChange = { viewModel.setBoardName(it) },
+                        label = { Text("Scoreboard name") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            cursorColor = iOSBlue,
-                        ),
                     )
                     MiniScorePreview(game)
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -138,8 +126,12 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                             .padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Game History", color = Color.White, modifier = Modifier.weight(1f))
-                        Text("›", color = Color.White.copy(alpha = 0.4f), fontSize = 20.sp)
+                        Text("Game History", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
@@ -147,7 +139,6 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
             Button(
                 onClick = { showRestartConfirm = true },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = CardBg, contentColor = iOSBlue),
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Text("Start a New Game", fontWeight = FontWeight.Medium)
@@ -155,7 +146,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
 
             SectionLabel("GAME SETUP")
             Card(
-                colors = CardDefaults.cardColors(containerColor = CardBg),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
@@ -167,7 +158,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         minusEnabled = game.players.size > 1,
                         plusEnabled = game.players.size < 12,
                     )
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -175,10 +166,14 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                             .padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Player Setup", color = Color.White, modifier = Modifier.weight(1f))
-                        Text("›", color = Color.White.copy(alpha = 0.4f), fontSize = 20.sp)
+                        Text("Player Setup", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     StepperRow(
                         label = "Score Step",
                         value = "${game.step}",
@@ -187,7 +182,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         minusEnabled = game.step > 1,
                         plusEnabled = game.step < 100,
                     )
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ToggleRow(
                         label = "Keep Last Score Visible",
                         checked = game.keepLastVisible,
@@ -202,13 +197,12 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     viewModel.startNewGame(2, listOf("Player 1", "Player 2"), ScoreAnythingColors.PlayerColors.take(2), 1)
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = iOSBlue),
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Text("Start a New Game")
             }
             TextButton(onClick = { viewModel.go(AppScreen.GameHistory) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Game History", color = iOSBlue)
+                Text("Game History")
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
@@ -223,10 +217,10 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                 TextButton(onClick = {
                     showRestartConfirm = false
                     viewModel.restartWithSameSetup()
-                }) { Text("Start", color = iOSBlue) }
+                }) { Text("Start") }
             },
             dismissButton = {
-                TextButton(onClick = { showRestartConfirm = false }) { Text("Cancel", color = iOSBlue) }
+                TextButton(onClick = { showRestartConfirm = false }) { Text("Cancel") }
             },
         )
     }
@@ -236,8 +230,8 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
 private fun SectionLabel(text: String) {
     Text(
         text = text,
-        fontSize = 12.sp,
-        color = Color.White.copy(alpha = 0.5f),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 14.dp, top = 6.dp),
     )
 }
@@ -247,7 +241,7 @@ private fun SectionLabel(text: String) {
 private fun MiniScorePreview(game: Game) {
     Row(modifier = Modifier.padding(vertical = 2.dp)) {
         game.players.forEachIndexed { i, p ->
-            if (i > 0) Text(" - ", color = Color.White.copy(alpha = 0.4f))
+            if (i > 0) Text(" - ", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("${game.currentScore(p.id)}", color = Color(p.color), fontWeight = FontWeight.Medium)
         }
     }
@@ -266,18 +260,18 @@ private fun StepperRow(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = Color.White, modifier = Modifier.weight(1f))
+        Text(label, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
         IconButton(onClick = onMinus, enabled = minusEnabled, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = iOSBlue)
+            Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = MaterialTheme.colorScheme.primary)
         }
         Text(
             value,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             modifier = Modifier.width(32.dp),
         )
         IconButton(onClick = onPlus, enabled = plusEnabled, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Default.Add, contentDescription = "Increase", tint = iOSBlue)
+            Icon(Icons.Default.Add, contentDescription = "Increase", tint = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -288,11 +282,10 @@ private fun ToggleRow(label: String, checked: Boolean, onChecked: (Boolean) -> U
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = Color.White, modifier = Modifier.weight(1f))
+        Text(label, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
         Switch(
             checked = checked,
             onCheckedChange = onChecked,
-            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF30D158)),
         )
     }
 }
@@ -308,7 +301,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(SheetBg)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -318,14 +311,14 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                 "Player Setup",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.align(Alignment.Center),
             )
             IconButton(
                 onClick = { viewModel.go(AppScreen.Settings) },
                 modifier = Modifier.align(Alignment.CenterEnd).size(32.dp),
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White.copy(alpha = 0.7f))
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -339,7 +332,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
             // alone isn't reliable: the tap that focuses the field re-places
             // the cursor after focus, clobbering the selection on device.)
             val defaultName = "Player ${index + 1}"
-            Card(                colors = CardDefaults.cardColors(containerColor = CardBg),
+            Card(                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Row(
@@ -369,7 +362,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                             )
                         }
                     }
-                    OutlinedTextField(
+                    TextField(
                         value = nameField,
                         onValueChange = {
                             nameField = it
@@ -402,14 +395,9 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                                     }
                                 }
                             },
-                        colors = OutlinedTextFieldDefaults.colors(
+                        colors = TextFieldDefaults.colors(
                             focusedTextColor = Color(player.color),
                             unfocusedTextColor = Color(player.color),
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            cursorColor = iOSBlue,
                         ),
                     )
                     Box(
@@ -421,7 +409,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                     )
                     if (game.players.size > 1) {
                         IconButton(onClick = { viewModel.removePlayer(player.id) }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Remove player", tint = Color.White.copy(alpha = 0.5f))
+                            Icon(Icons.Default.Close, contentDescription = "Remove player", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -432,7 +420,6 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
             Button(
                 onClick = { viewModel.addPlayer() },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = CardBg, contentColor = iOSBlue),
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Icon(Icons.Default.PersonAdd, contentDescription = null)
@@ -442,7 +429,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
         } else {
             Text(
                 "Maximum 12 players",
-                color = Color.White.copy(alpha = 0.5f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
@@ -500,7 +487,7 @@ private fun RingPreview(players: List<Player>, modifier: Modifier = Modifier) {
 private fun ColorPaletteDialog(selected: Int, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF3A3A3C)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             shape = RoundedCornerShape(16.dp),
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -512,7 +499,7 @@ private fun ColorPaletteDialog(selected: Int, onPick: (Int) -> Unit, onDismiss: 
                                     .size(40.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (c == selected) Color.White
+                                        if (c == selected) MaterialTheme.colorScheme.primary
                                         else Color.Transparent
                                     )
                                     .clickable { onPick(c) },

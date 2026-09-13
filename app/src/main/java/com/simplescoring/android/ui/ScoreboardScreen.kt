@@ -30,7 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -309,13 +309,14 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             val minDim = min(wPx, hPx)
             fun dp(px: Float): Dp = with(density) { px.toDp() }
 
-            // Ring sized like iOS; dots sit on it.
+            // Ring sized like iOS; dots sit on it. Both run 15% slimmed
+            // down from raw scale so the dial doesn't crowd the labels.
             val ringR = minDim * 0.34f
             val share = (2 * PI.toFloat() * ringR / n) * 0.68f
-            val dotD = share.coerceIn(
+            val dotD = (share.coerceIn(
                 with(density) { 34.dp.toPx() },
                 with(density) { 64.dp.toPx() },
-            )
+            )) * 0.85f
             // Track exactly matches the dot diameter (derived from the same
             // already-clamped value, never capped separately) so the ring
             // and the colored circles are always the same thickness.
@@ -529,7 +530,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 // order, alternating a near row (just past the ring) and a
                 // far row (screen edge) — since a half that crowded usually
                 // has no natural anchor left to stack from.
-                val labelPositions = Array(n) { null as Offset? }
+                val labelPositions = arrayOfNulls<Offset>(n)
                 val stackOffset = labelBoxPx + with(density) { 12.dp.toPx() }
                 // Minimum breathing room between a label and the ring/dots so
                 // crowded boards never read as clipped into the dial.
@@ -713,38 +714,23 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 .padding(vertical = 12.dp, horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
         ) {
-            PillButton(
-                label = "Undo",
-                icon = { Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, tint = Color(0xFF0A84FF), modifier = Modifier.size(18.dp)) },
+            FilledTonalButton(
                 enabled = viewModel.undoStack.isNotEmpty(),
                 onClick = { viewModel.undo() },
-            )
-            PillButton(
-                label = "Redo",
-                icon = { Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null, tint = Color(0xFF0A84FF), modifier = Modifier.size(18.dp)) },
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Undo")
+            }
+            FilledTonalButton(
                 enabled = viewModel.redoStack.isNotEmpty(),
                 onClick = { viewModel.redo() },
-            )
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Redo")
+            }
         }
-    }
-}
-
-@Composable
-private fun PillButton(label: String, icon: @Composable () -> Unit, enabled: Boolean, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color.White.copy(alpha = 0.12f),
-            contentColor = Color(0xFF0A84FF),
-            disabledContainerColor = Color.White.copy(alpha = 0.06f),
-            disabledContentColor = Color.White.copy(alpha = 0.3f),
-        ),
-        shape = RoundedCornerShape(24.dp),
-    ) {
-        icon()
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(label)
     }
 }
 
