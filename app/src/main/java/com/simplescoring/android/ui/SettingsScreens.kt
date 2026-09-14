@@ -126,7 +126,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             if (game != null) {
                 SettingsGroup(label = "Game setup") {
@@ -212,7 +212,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                             caption = "Points per tap",
                             onMinus = { viewModel.setTapPoints(game.tapPoints - 1) },
                             onPlus = { viewModel.setTapPoints(game.tapPoints + 1) },
-                            minusEnabled = game.tapPoints > 1,
+                            minusEnabled = game.tapPoints > 0,
                             plusEnabled = game.tapPoints < 100,
                             modifier = Modifier.weight(1f),
                         )
@@ -321,7 +321,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                             listOf("Player 1", "Player 2"),
                             ScoreAnythingColors.PlayerColors.take(2),
                             rotationPoints = 10,
-                            tapPoints = 1,
+                            tapPoints = 0,
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),

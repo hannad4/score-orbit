@@ -29,7 +29,7 @@ data class Game(
     val name: String = "Untitled Game",
     val players: List<Player> = emptyList(),
     val rotationPoints: Int = 10,
-    val tapPoints: Int = 1,
+    val tapPoints: Int = 0,
     val winMetric: WinMetric = WinMetric.HIGHEST,
     val allowNegative: Boolean = false,
     val keepLastVisible: Boolean = false,

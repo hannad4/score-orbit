@@ -204,6 +204,8 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     fun showFlash(color: Int, delta: Int, name: String) {
         // NOTE: like commitGesture, this runs from pointer-input and tap
         // handlers that may hold stale compositions: only State reads here.
+        // Zero-point taps flash nothing.
+        if (delta == 0) return
         flashJob?.cancel()
         lastFlash = Triple(color, delta, name)
         flashAlpha = 1f
