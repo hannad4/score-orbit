@@ -198,7 +198,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                 SettingsGroup(label = "Scoring") {
                     ListItem(
                         headlineContent = { Text("Points per Rotation") },
-                        supportingContent = { Text("One full dial turn scores this much") },
+                        supportingContent = { Text("One full turn of the dial scores ${game.rotationPoints} ${if (game.rotationPoints == 1) "point" else "points"}") },
                         leadingContent = {
                             Icon(
                                 Icons.Default.Refresh,
@@ -220,7 +220,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
                         headlineContent = { Text("Tap Value") },
-                        supportingContent = { Text("Tapping a dot scores this much") },
+                        supportingContent = { Text("Tapping a dot scores ${game.tapPoints} ${if (game.tapPoints == 1) "point" else "points"}") },
                         leadingContent = {
                             Icon(
                                 Icons.Default.TouchApp,
@@ -248,13 +248,14 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            WinMetric.entries.forEachIndexed { i, metric ->
+                            val metrics = listOf(WinMetric.LOWEST, WinMetric.HIGHEST)
+                            metrics.forEachIndexed { i, metric ->
                                 SegmentedButton(
                                     selected = game.winMetric == metric,
                                     onClick = { viewModel.setWinMetric(metric) },
                                     shape = SegmentedButtonDefaults.itemShape(
                                         index = i,
-                                        count = WinMetric.entries.size,
+                                        count = metrics.size,
                                     ),
                                 ) {
                                     Text(if (metric == WinMetric.HIGHEST) "Highest" else "Lowest")
