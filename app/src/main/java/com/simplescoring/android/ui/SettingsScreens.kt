@@ -197,7 +197,13 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
                         headlineContent = { Text("Score Step") },
-                        supportingContent = { Text("Points per tap") },
+                        supportingContent = {
+                            Text(
+                                "Tap scores ${game.step} " +
+                                    "${if (game.step == 1) "pt" else "pts"} · " +
+                                    "full turn scores ${game.step * 10}"
+                            )
+                        },
                         leadingContent = {
                             Icon(
                                 Icons.Default.PlusOne,
@@ -292,7 +298,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
                         headlineContent = { Text("Enlarge Active Dot") },
-                        supportingContent = { Text("The spinning player's dot grows while scoring") },
+                        supportingContent = { Text("The selected dot is enlarged while scoring") },
                         leadingContent = {
                             Icon(
                                 Icons.Default.Circle,

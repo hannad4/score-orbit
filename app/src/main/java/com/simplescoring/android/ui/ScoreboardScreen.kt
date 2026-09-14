@@ -204,6 +204,25 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
         lastAngle = Float.NaN
     }
 
+    fun showFlash(color: Int, delta: Int, name: String) {
+        // NOTE: like commitGesture, this runs from pointer-input and tap
+        // handlers that may hold stale compositions: only State reads here.
+        if (!latestGame.keepLastVisible) return
+        flashJob?.cancel()
+        lastFlash = Triple(color, delta, name)
+        flashAlpha = 1f
+        flashJob = scope.launch {
+            delay(1600)
+            animate(
+                initialValue = 1f,
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 400),
+            ) { value, _ -> flashAlpha = value }
+            lastFlash = null
+            flashJob = null
+        }
+    }
+
     fun commitGesture() {
         // NOTE: this is called from inside pointerInput, whose block is not
         // restarted mid-gesture. It must only read State (current at call
@@ -219,21 +238,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             // through the unwind. activeId stays until the spring settles so
             // the dots/trail keep animating back in place.
             pending = 0
-            if (g.keepLastVisible && player != null) {
-                flashJob?.cancel()
-                lastFlash = Triple(player.color, delta, player.name)
-                flashAlpha = 1f
-                flashJob = scope.launch {
-                    delay(1600)
-                    animate(
-                        initialValue = 1f,
-                        targetValue = 0f,
-                        animationSpec = tween(durationMillis = 400),
-                    ) { value, _ -> flashAlpha = value }
-                    lastFlash = null
-                    flashJob = null
-                }
-            }
+            if (player != null) showFlash(player.color, delta, player.name)
         }
         lastAngle = Float.NaN
 
@@ -450,7 +455,11 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 // gesture is technically still settling.
                 val livePlayer = activePlayer
                 val flash = lastFlash
-                val showLive = livePlayer != null && (pending != 0 || flash == null)
+                // With "keep last visible" off, nothing static may linger in
+                // the center: no touch-down name, no unwind name, no flash.
+                // The live readout only ever shows while points accumulate.
+                val keepLast = game.keepLastVisible
+                val showLive = livePlayer != null && (pending != 0 || (flash == null && keepLast))
                 if (showLive && livePlayer != null) {
                     val c = Color(livePlayer.color)
                     Column(
@@ -504,6 +513,17 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             textAlign = TextAlign.Center,
                         )
                     }
+                } else if (game.entries.isEmpty() && activeId == null) {
+                    // First-run discovery hint: vanishes with the first score.
+                    Text(
+                        text = "Tap a dot, or drag around the ring",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = 48.dp),
+                    )
                 }
 
                 game.players.forEachIndexed { i, player ->
@@ -524,6 +544,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         onTap = {
                             buzz(ctx, 12)
                             viewModel.addScore(player.id, game.step)
+                            showFlash(player.color, game.step, player.name)
                         },
                     )
                 }
