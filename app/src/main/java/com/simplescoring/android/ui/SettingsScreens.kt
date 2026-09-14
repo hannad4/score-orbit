@@ -300,7 +300,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
                         headlineContent = { Text("Enlarge Active Dot") },
-                        supportingContent = { Text("The selected dot is enlarged while scoring") },
+                        supportingContent = { Text("Temporarily enlarge the dot for the currently scoring player") },
                         leadingContent = {
                             Icon(
                                 Icons.Default.Circle,
