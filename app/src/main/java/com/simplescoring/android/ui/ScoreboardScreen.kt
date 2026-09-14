@@ -551,6 +551,20 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 val a = seatAngle(i, n)
                                 val dirX = cos(a).toFloat()
                                 val dirY = sin(a).toFloat()
+                                val dotX = cx + dirX * ringR
+                                val dotY = cy + dirY * ringR
+                                if (abs(dirX) >= cos(40 * PI / 180).toFloat()) {
+                                    // Side seat: no room for a full label box
+                                    // further out on the ray — it would land
+                                    // on top of its own dot. Stack vertically
+                                    // off the dot instead (up for top-half
+                                    // seats, down for bottom-half ones).
+                                    val above = sin(a) <= 0.0
+                                    val y = dotY + (if (above) -1f else 1f) *
+                                        (dotD / 2f + labelClearPx + labelBoxPx / 2f)
+                                    labelPositions[i] = Offset(dotX, y)
+                                    continue
+                                }
                                 val maxDist = rayToEdge(center, Offset(dirX, dirY), wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
                                 val dist = min(1.85f * ringR, maxDist).coerceAtLeast(nearD)
                                 labelPositions[i] = Offset(cx + dirX * dist, cy + dirY * dist)
@@ -573,9 +587,19 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             // both halves) doesn't read as one crowded band
                             // straddling the middle of the screen.
                             val centerlineClearance = labelBoxPx / 2f
+                            // Fit both rows into the room above/below the
+                            // ring: shrink them toward the dial
+                            // proportionally when the far row would leave the
+                            // screen, so labels never clip at the edges.
+                            val vRoom = (min(cy, hPx - cy) - edgeMarginPx - labelBoxPx / 2f)
+                                .coerceAtLeast(0f)
+                            val vWant = farD + centerlineClearance
+                            val vFit = if (vWant > vRoom && vWant > 0f) {
+                                (vRoom / vWant).coerceIn(0.2f, 1f)
+                            } else 1f
                             ordered.forEachIndexed { j, i ->
                                 val x = xMin + j * (xMax - xMin) / (k - 1)
-                                val d = (if (isFar[j]) farD else nearD) + centerlineClearance
+                                val d = ((if (isFar[j]) farD else nearD) + centerlineClearance) * vFit
                                 labelPositions[i] = Offset(x, cy + sign * d)
                             }
                         }
@@ -682,8 +706,17 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 }
 
                 // Render all labels.
+                // Final guard for every layout above: no label may leave the
+                // screen. Crowded boards overlap slightly instead of
+                // clipping cut-off text at the edges.
+                fun clampAxis(v: Float, size: Float): Float {
+                    val lo = labelBoxPx / 2f + edgeMarginPx
+                    val hi = size - labelBoxPx / 2f - edgeMarginPx
+                    return if (hi <= lo) size / 2f else v.coerceIn(lo, hi)
+                }
                 game.players.forEachIndexed { i, player ->
-                    val pos = labelPositions[i]!!
+                    val raw = labelPositions[i]!!
+                    val pos = Offset(clampAxis(raw.x, wPx), clampAxis(raw.y, hPx))
                     val isActive = activeId == player.id
                     val showingPending = isActive && pending != 0
                     SeatScore(
