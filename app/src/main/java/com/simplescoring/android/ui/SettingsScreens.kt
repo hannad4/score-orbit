@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PlusOne
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -125,7 +126,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (game != null) {
-                SettingsGroup(label = "Scoreboard") {
+                SettingsGroup(label = "Game setup") {
                     TextField(
                         value = game.name,
                         onValueChange = { viewModel.setBoardName(it) },
@@ -141,18 +142,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         ),
                     )
                     MiniScorePreview(game)
-                }
-
-                Button(
-                    onClick = { showRestartConfirm = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                ) {
-                    Text("Start a New Game", style = MaterialTheme.typography.titleMedium)
-                }
-
-                SettingsGroup(label = "Game setup") {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
                         headlineContent = { Text("Number of Players") },
                         leadingContent = {
@@ -194,48 +184,57 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         modifier = Modifier.clickable { viewModel.go(AppScreen.PlayerSetup) },
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+
+                Button(
+                    onClick = { showRestartConfirm = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                ) {
+                    Text("Start a New Game", style = MaterialTheme.typography.titleMedium)
+                }
+
+                SettingsGroup(label = "Scoring") {
                     ListItem(
-                        headlineContent = { Text("Score Step") },
-                        supportingContent = {
-                            Text(
-                                "Tap scores ${game.step} " +
-                                    "${if (game.step == 1) "pt" else "pts"} · " +
-                                    "full turn scores ${game.step * 10}"
-                            )
-                        },
+                        headlineContent = { Text("Points per Rotation") },
+                        supportingContent = { Text("One full dial turn scores this much") },
                         leadingContent = {
                             Icon(
-                                Icons.Default.PlusOne,
+                                Icons.Default.Refresh,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         },
                         trailingContent = {
                             StepperControl(
-                                value = "${game.step}",
-                                onMinus = { viewModel.setStep(game.step - 1) },
-                                onPlus = { viewModel.setStep(game.step + 1) },
-                                minusEnabled = game.step > 1,
-                                plusEnabled = game.step < 100,
+                                value = "${game.rotationPoints}",
+                                onMinus = { viewModel.setRotationPoints(game.rotationPoints - 1) },
+                                onPlus = { viewModel.setRotationPoints(game.rotationPoints + 1) },
+                                minusEnabled = game.rotationPoints > 1,
+                                plusEnabled = game.rotationPoints < 100,
                             )
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
-                        headlineContent = { Text("Keep Last Score Visible") },
+                        headlineContent = { Text("Tap Value") },
+                        supportingContent = { Text("Tapping a dot scores this much") },
                         leadingContent = {
                             Icon(
-                                Icons.Default.Visibility,
+                                Icons.Default.TouchApp,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         },
                         trailingContent = {
-                            Switch(
-                                checked = game.keepLastVisible,
-                                onCheckedChange = { viewModel.setKeepLastVisible(it) },
+                            StepperControl(
+                                value = "${game.tapPoints}",
+                                onMinus = { viewModel.setTapPoints(game.tapPoints - 1) },
+                                onPlus = { viewModel.setTapPoints(game.tapPoints + 1) },
+                                minusEnabled = game.tapPoints > 1,
+                                plusEnabled = game.tapPoints < 100,
                             )
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -314,12 +313,37 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    ListItem(
+                        headlineContent = { Text("Keep Last Score Visible") },
+                        supportingContent = { Text("Flash the last change in the ring center") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Visibility,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = game.keepLastVisible,
+                                onCheckedChange = { viewModel.setKeepLastVisible(it) },
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
                 }
             } else {
                 // No active game (just finished): offer a fresh one.
                 Button(
                     onClick = {
-                        viewModel.startNewGame(2, listOf("Player 1", "Player 2"), ScoreAnythingColors.PlayerColors.take(2), 1)
+                        viewModel.startNewGame(
+                            2,
+                            listOf("Player 1", "Player 2"),
+                            ScoreAnythingColors.PlayerColors.take(2),
+                            rotationPoints = 10,
+                            tapPoints = 1,
+                        )
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {

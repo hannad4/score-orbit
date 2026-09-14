@@ -56,7 +56,8 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
                 playerCount = 2,
                 names = listOf("Player 1", "Player 2"),
                 colors = ScoreAnythingColors.PlayerColors.take(2),
-                step = 1,
+                rotationPoints = 10,
+                tapPoints = 1,
                 boardName = "My Game",
                 winMetric = WinMetric.HIGHEST,
             )
@@ -73,7 +74,8 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         playerCount: Int,
         names: List<String>,
         colors: List<Int>,
-        step: Int,
+        rotationPoints: Int,
+        tapPoints: Int,
         boardName: String = "My Game",
         winMetric: WinMetric = WinMetric.HIGHEST,
         keepLastVisible: Boolean = true,
@@ -91,7 +93,8 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         _currentGame.value = Game(
             name = boardName.ifBlank { "My Game" },
             players = players,
-            step = step.coerceIn(1, 100),
+            rotationPoints = rotationPoints.coerceIn(1, 100),
+            tapPoints = tapPoints.coerceIn(1, 100),
             winMetric = winMetric,
             allowNegative = true,
             keepLastVisible = keepLastVisible,
@@ -110,7 +113,8 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             playerCount = game.players.size,
             names = game.players.map { it.name },
             colors = game.players.map { it.color },
-            step = game.step,
+            rotationPoints = game.rotationPoints,
+            tapPoints = game.tapPoints,
             boardName = game.name,
             winMetric = game.winMetric,
             keepLastVisible = game.keepLastVisible,
@@ -162,8 +166,12 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         _currentGame.value = _currentGame.value?.copy(name = name)
     }
 
-    fun setStep(step: Int) {
-        _currentGame.value = _currentGame.value?.copy(step = step.coerceIn(1, 100))
+    fun setRotationPoints(points: Int) {
+        _currentGame.value = _currentGame.value?.copy(rotationPoints = points.coerceIn(1, 100))
+    }
+
+    fun setTapPoints(points: Int) {
+        _currentGame.value = _currentGame.value?.copy(tapPoints = points.coerceIn(1, 100))
     }
 
     fun setWinMetric(metric: WinMetric) {

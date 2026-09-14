@@ -46,7 +46,8 @@ class ScreenshotsTest {
         return Game(
             name = "Game Night",
             players = players,
-            step = 1,
+            rotationPoints = 10,
+            tapPoints = 1,
             winMetric = WinMetric.HIGHEST,
             entries = entries,
         )

@@ -76,9 +76,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Points scored by one full turn of the ring, scaled by the score step. */
-private fun turnValue(step: Int) = 10 * step.coerceAtLeast(1)
-
 /**
  * Seat angle in radians for [index] of [total] (clockwise, y-down). Seat 0
  * sits at the top by default. Only a [total] that's a multiple of 4 always
@@ -187,7 +184,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     val scope = rememberCoroutineScope()
     var springJob by remember(game.id) { mutableStateOf<Job?>(null) }
 
-    val turn = turnValue(game.step)
+    val turn = game.rotationPoints.coerceAtLeast(1)
     val activeIndex = game.players.indexOfFirst { it.id == activeId }
     val activePlayer = activeIndex.takeIf { it >= 0 }?.let { game.players[it] }
 
@@ -374,7 +371,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(game.id, game.step) {
+                    .pointerInput(game.id, game.rotationPoints) {
                         detectDragGestures(
                             onDragStart = { offset ->
                                 val g = latestGame
@@ -513,17 +510,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             textAlign = TextAlign.Center,
                         )
                     }
-                } else if (game.entries.isEmpty() && activeId == null) {
-                    // First-run discovery hint: vanishes with the first score.
-                    Text(
-                        text = "Tap a dot, or drag around the ring",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(horizontal = 48.dp),
-                    )
                 }
 
                 game.players.forEachIndexed { i, player ->
@@ -543,8 +529,8 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         ),
                         onTap = {
                             buzz(ctx, 12)
-                            viewModel.addScore(player.id, game.step)
-                            showFlash(player.color, game.step, player.name)
+                            viewModel.addScore(player.id, game.tapPoints)
+                            showFlash(player.color, game.tapPoints, player.name)
                         },
                     )
                 }
