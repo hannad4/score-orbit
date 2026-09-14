@@ -193,49 +193,30 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                 }
 
                 SettingsGroup(label = "Scoring") {
-                    ListItem(
-                        headlineContent = { Text("Points per Rotation") },
-                        supportingContent = { Text("${game.rotationPoints} per turn") },
-                        leadingContent = {
-                            Icon(
-                                Icons.Default.Refresh,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        trailingContent = {
-                            StepperControl(
-                                value = "${game.rotationPoints}",
-                                onMinus = { viewModel.setRotationPoints(game.rotationPoints - 1) },
-                                onPlus = { viewModel.setRotationPoints(game.rotationPoints + 1) },
-                                minusEnabled = game.rotationPoints > 1,
-                                plusEnabled = game.rotationPoints < 100,
-                            )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    ListItem(
-                        headlineContent = { Text("Tap Value") },
-                        supportingContent = { Text("${game.tapPoints} per tap") },
-                        leadingContent = {
-                            Icon(
-                                Icons.Default.TouchApp,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        trailingContent = {
-                            StepperControl(
-                                value = "${game.tapPoints}",
-                                onMinus = { viewModel.setTapPoints(game.tapPoints - 1) },
-                                onPlus = { viewModel.setTapPoints(game.tapPoints + 1) },
-                                minusEnabled = game.tapPoints > 1,
-                                plusEnabled = game.tapPoints < 100,
-                            )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                    ) {
+                        StepperCell(
+                            value = "${game.rotationPoints}",
+                            caption = "Points per revolution",
+                            onMinus = { viewModel.setRotationPoints(game.rotationPoints - 1) },
+                            onPlus = { viewModel.setRotationPoints(game.rotationPoints + 1) },
+                            minusEnabled = game.rotationPoints > 1,
+                            plusEnabled = game.rotationPoints < 100,
+                            modifier = Modifier.weight(1f),
+                        )
+                        StepperCell(
+                            value = "${game.tapPoints}",
+                            caption = "Points per tap",
+                            onMinus = { viewModel.setTapPoints(game.tapPoints - 1) },
+                            onPlus = { viewModel.setTapPoints(game.tapPoints + 1) },
+                            minusEnabled = game.tapPoints > 1,
+                            plusEnabled = game.tapPoints < 100,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                         Text(
@@ -410,6 +391,49 @@ private fun StepperControl(
         FilledTonalIconButton(onClick = onPlus, enabled = plusEnabled, modifier = Modifier.size(36.dp)) {
             Icon(Icons.Default.Add, contentDescription = "Increase")
         }
+    }
+}
+
+/** Compact value-forward stepper: big number, steppers, one-line caption. */
+@Composable
+private fun StepperCell(
+    value: String,
+    caption: String,
+    onMinus: () -> Unit,
+    onPlus: () -> Unit,
+    minusEnabled: Boolean = true,
+    plusEnabled: Boolean = true,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            value,
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FilledTonalIconButton(onClick = onMinus, enabled = minusEnabled, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Remove, contentDescription = "Decrease")
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            FilledTonalIconButton(onClick = onPlus, enabled = plusEnabled, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Add, contentDescription = "Increase")
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            caption,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
