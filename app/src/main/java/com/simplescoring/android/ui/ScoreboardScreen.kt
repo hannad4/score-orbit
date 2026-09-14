@@ -210,11 +210,11 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
         if (!latestGame.keepLastVisible) {
             // Brief flash then fade ("off" = transient display)
             flashJob = scope.launch {
-                delay(1600)
+                delay(800)
                 animate(
                     initialValue = 1f,
                     targetValue = 0f,
-                    animationSpec = tween(durationMillis = 400),
+                    animationSpec = tween(durationMillis = 300),
                 ) { value, _ -> flashAlpha = value }
                 lastFlash = null
                 flashJob = null

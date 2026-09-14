@@ -32,7 +32,7 @@ data class Game(
     val tapPoints: Int = 1,
     val winMetric: WinMetric = WinMetric.HIGHEST,
     val allowNegative: Boolean = false,
-    val keepLastVisible: Boolean = true,
+    val keepLastVisible: Boolean = false,
     val enlargeActiveDot: Boolean = false,
     val entries: List<ScoreEntry> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),

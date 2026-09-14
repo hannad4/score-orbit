@@ -58,6 +58,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -129,21 +130,15 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
         ) {
             if (game != null) {
                 SettingsGroup(label = "Game setup") {
-                    TextField(
+                    OutlinedTextField(
                         value = game.name,
                         onValueChange = { viewModel.setBoardName(it) },
                         label = { Text("Scoreboard name") },
                         singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            unfocusedIndicatorColor = Color.Transparent,
-                        ),
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                     )
-                    MiniScorePreview(game)
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
                         headlineContent = { Text("Number of Players") },
@@ -200,7 +195,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                 SettingsGroup(label = "Scoring") {
                     ListItem(
                         headlineContent = { Text("Points per Rotation") },
-                        supportingContent = { Text("One full turn of the dial scores ${game.rotationPoints} ${if (game.rotationPoints == 1) "point" else "points"}") },
+                        supportingContent = { Text("${game.rotationPoints} per turn") },
                         leadingContent = {
                             Icon(
                                 Icons.Default.Refresh,
@@ -222,7 +217,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
                         headlineContent = { Text("Tap Value") },
-                        supportingContent = { Text("Tapping a dot scores ${game.tapPoints} ${if (game.tapPoints == 1) "point" else "points"}") },
+                        supportingContent = { Text("${game.tapPoints} per tap") },
                         leadingContent = {
                             Icon(
                                 Icons.Default.TouchApp,
@@ -381,25 +376,14 @@ private fun SettingsGroup(label: String, content: @Composable () -> Unit) {
     Column {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 16.dp, bottom = 6.dp),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 16.dp, bottom = 8.dp),
         )
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         ) {
             content()
-        }
-    }
-}
-
-/** "17 - 21 - 35" mini preview in player colors. */
-@Composable
-private fun MiniScorePreview(game: Game) {
-    Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        game.players.forEachIndexed { i, p ->
-            if (i > 0) Text(" - ", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("${game.currentScore(p.id)}", color = Color(p.color), fontWeight = FontWeight.Medium)
         }
     }
 }

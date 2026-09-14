@@ -78,7 +78,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         tapPoints: Int,
         boardName: String = "My Game",
         winMetric: WinMetric = WinMetric.HIGHEST,
-        keepLastVisible: Boolean = true,
+        keepLastVisible: Boolean = false,
         enlargeActiveDot: Boolean = false,
     ) {
         val count = playerCount.coerceIn(1, 12)
