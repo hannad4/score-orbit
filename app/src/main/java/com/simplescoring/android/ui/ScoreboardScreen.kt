@@ -182,6 +182,12 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     // Settle fade 0->1 after the rewind: bead fades out while the hidden
     // dots fade back in, so nothing pops.
     var settle by remember(game.id) { mutableFloatStateOf(0f) }
+    // Slow trail dissolve 1->0 after settling: the sweep color eases back
+    // to gray instead of blinking out.
+    var trailDissolve by remember(game.id) { mutableFloatStateOf(1f) }
+    // Marker grow 0->1 on grab (only when enlargement is on).
+    var markerScale by remember(game.id) { mutableFloatStateOf(0f) }
+    var markerJob by remember(game.id) { mutableStateOf<Job?>(null) }
     var flashJob by remember(game.id) { mutableStateOf<Job?>(null) }
     // In-flight "spring back" animation that unwinds the dial after release.
     val scope = rememberCoroutineScope()
@@ -194,11 +200,15 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     fun resetGesture() {
         springJob?.cancel()
         springJob = null
+        markerJob?.cancel()
+        markerJob = null
         flashJob?.cancel()
         flashJob = null
         lastFlash = null
         flashAlpha = 0f
         settle = 0f
+        trailDissolve = 1f
+        markerScale = 0f
         activeId = null
         pending = 0
         accRadians = 0f
@@ -278,15 +288,25 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 // Already (visually) home: nothing to unwind.
                 accRadians = 0f
             }
-            // Smooth handoff instead of snapping to gray: fade the bead
-            // out while the hidden dots fade back in. Runs after every
-            // release — even tiny flicks — so nothing ever pops.
+            // Smooth handoff instead of snapping to gray, in two phases.
+            // Phase 1: the bead shrinks out while the hidden dots fade
+            // back in. Phase 2: the sweep color itself dissolves slowly
+            // back to the gray ring. Runs after every release — even tiny
+            // flicks — so nothing ever pops.
             animate(
                 initialValue = 0f,
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 300),
+                animationSpec = tween(durationMillis = 350),
             ) { value, _ -> settle = value }
+            animate(
+                initialValue = 1f,
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 900),
+            ) { value, _ -> trailDissolve = value }
+            accRadians = 0f
             settle = 0f
+            trailDissolve = 1f
+            markerScale = 0f
             activeId = null
             springJob = null
         }
@@ -400,6 +420,21 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 resetGesture()
                                 val seat = nearestSeat(offset, center, g.players.size)
                                 activeId = g.players[seat].id
+                                // Grow the touch marker in on grab (only when
+                                // enlargement is on — otherwise it stays put).
+                                if (g.enlargeActiveDot) {
+                                    markerJob?.cancel()
+                                    markerJob = scope.launch {
+                                        animate(
+                                            initialValue = 0f,
+                                            targetValue = 1f,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = 500f,
+                                            ),
+                                        ) { value, _ -> markerScale = value }
+                                    }
+                                }
                                 lastAngle = atan2(
                                     (offset.y - cy).toDouble(),
                                     (offset.x - cx).toDouble()
@@ -453,6 +488,8 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     activeColor = activePlayer?.let { Color(it.color) },
                     showMarker = game.enlargeActiveDot,
                     settleAlpha = settle,
+                    markerScale = markerScale,
+                    trailAlpha = trailDissolve,
                     // Arc trails from the player's dot along the drag. Not
                     // clamped to one lap: RingDial itself turns anything
                     // beyond 360° into a stacked, full-circle fade instead of
@@ -795,6 +832,8 @@ private fun RingDial(
     activeColor: Color?,
     showMarker: Boolean,
     settleAlpha: Float,
+    markerScale: Float,
+    trailAlpha: Float,
     arcStartDeg: Float,
     arcSweepDeg: Float,
 ) {
@@ -819,12 +858,11 @@ private fun RingDial(
         )
         if (activeColor != null) {
             val tipDeg = arcStartDeg + arcSweepDeg
-            // Settle fade for the whole trail (not just the bead): after a
+            // Slow dissolve for the whole trail (not just the bead): after a
             // multi-turn spin the sweep stays past 360° through the entire
             // rewind, so without this the full colored ring would blink out
-            // in a single frame at release instead of dissolving to gray.
-            val fade = 1f - settleAlpha
-            if (arcSweepDeg != 0f && fade > 0f) {
+            // in a single frame at release instead of easing back to gray.
+            if (arcSweepDeg != 0f && trailAlpha > 0f) {
                 // Comet trail: full opacity at the touch point, fading to
                 // 10% one full turn behind it. Sampled as a sweep gradient
                 // fixed in absolute canvas angle (not rotated to the moving
@@ -841,7 +879,7 @@ private fun RingDial(
                         brush = trailBrush,
                         radius = ringRPx,
                         center = center,
-                        alpha = fade,
+                        alpha = trailAlpha,
                         style = Stroke(width = trackPx),
                     )
                 } else {
@@ -861,24 +899,23 @@ private fun RingDial(
                         useCenter = false,
                         topLeft = Offset(center.x - ringRPx, center.y - ringRPx),
                         size = Size(ringRPx * 2f, ringRPx * 2f),
-                        alpha = fade,
+                        alpha = trailAlpha,
                         style = Stroke(width = trackPx, cap = StrokeCap.Round),
                     )
                 }
             }
 
-            // Touch-marker disk: a bead riding the ring's channel at the
-            // live input position, bigger than the track so it reads as the
-            // "now" point against the fading trail behind it. Gated by the
-            // "enlarge active dot" setting — off means a fixed-diameter dial.
-            // Fades with the settle animation instead of popping out.
+            // Touch-marker disk: grows tiny-to-large on grab, then shrinks
+            // back out with the settle animation instead of popping. Gated
+            // by the "enlarge active dot" setting — off means a
+            // fixed-diameter dial.
             if (!showMarker) return@Canvas
             val beadAlpha = 1f - settleAlpha
-            if (beadAlpha <= 0f) return@Canvas
+            if (beadAlpha <= 0f || markerScale <= 0f) return@Canvas
             val tipRad = tipDeg * PI.toFloat() / 180f
             drawCircle(
                 color = activeColor.copy(alpha = beadAlpha),
-                radius = trackPx * 0.7f,
+                radius = trackPx * 0.7f * markerScale,
                 center = Offset(
                     center.x + cos(tipRad) * ringRPx,
                     center.y + sin(tipRad) * ringRPx,
