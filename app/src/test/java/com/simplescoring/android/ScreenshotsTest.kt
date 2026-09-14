@@ -1,6 +1,7 @@
 package com.simplescoring.android
 
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import app.cash.paparazzi.DeviceConfig.Companion.PIXEL_5
 import app.cash.paparazzi.Paparazzi
 import com.simplescoring.android.model.Game
@@ -8,12 +9,14 @@ import com.simplescoring.android.model.Player
 import com.simplescoring.android.model.Rotation
 import com.simplescoring.android.model.ScoreEntry
 import com.simplescoring.android.model.WinMetric
-import com.simplescoring.android.ui.PlayerSetupScreenimport com.simplescoring.android.ui.ScoreHistoryScreen
+import com.simplescoring.android.ui.PlayerSetupScreen
+import com.simplescoring.android.ui.ScoreHistoryScreen
 import com.simplescoring.android.ui.ScoreboardScreen
 import com.simplescoring.android.ui.SettingsScreen
 import com.simplescoring.android.ui.theme.ScoreAnythingColors
 import com.simplescoring.android.ui.theme.ScoreAnythingTheme
 import com.simplescoring.android.viewmodel.ScoreViewModel
+import com.simplescoring.android.viewmodel.ThemeMode
 import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mockito
@@ -53,6 +56,7 @@ class ScreenshotsTest {
         val vm = Mockito.mock(ScoreViewModel::class.java)
         Mockito.`when`(vm.undoStack).thenReturn(mutableStateListOf(*undo))
         Mockito.`when`(vm.redoStack).thenReturn(mutableStateListOf())
+        Mockito.`when`(vm.themeMode).thenReturn(mutableStateOf(ThemeMode.SYSTEM))
         return vm
     }
 
