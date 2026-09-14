@@ -27,6 +27,7 @@ fun ScoreAnythingApp(viewModel: ScoreViewModel) {
         when (screen) {
             AppScreen.PlayerSetup -> viewModel.go(AppScreen.Settings)
             AppScreen.ScoreHistory -> viewModel.go(AppScreen.Board)
+            AppScreen.Leaderboard -> viewModel.go(AppScreen.Board)
             AppScreen.Settings -> if (game != null) viewModel.go(AppScreen.Board)
             AppScreen.Board -> Unit
         }
@@ -66,6 +67,10 @@ fun ScoreAnythingApp(viewModel: ScoreViewModel) {
                 AppScreen.ScoreHistory -> {
                     val g = game
                     if (g != null) ScoreHistoryScreen(game = g, viewModel = viewModel)
+                }
+                AppScreen.Leaderboard -> {
+                    val g = game
+                    if (g != null) LeaderboardScreen(game = g, viewModel = viewModel)
                 }
             }
         }

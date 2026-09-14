@@ -5,12 +5,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,14 +67,6 @@ fun ScoreHistoryScreen(game: Game, viewModel: ScoreViewModel) {
                 navigationIcon = {
                     IconButton(onClick = { viewModel.go(AppScreen.Board) }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.undo() }, enabled = canUndo) {
-                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
-                    }
-                    IconButton(onClick = { viewModel.redo() }, enabled = canRedo) {
-                        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -145,6 +140,35 @@ fun ScoreHistoryScreen(game: Game, viewModel: ScoreViewModel) {
                             modifier = Modifier.padding(horizontal = 16.dp),
                         )
                     }
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                FilledTonalButton(
+                    enabled = canUndo,
+                    onClick = { viewModel.undo() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(60.dp),
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(22.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Undo", style = MaterialTheme.typography.titleMedium)
+                }
+                FilledTonalButton(
+                    enabled = canRedo,
+                    onClick = { viewModel.redo() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(60.dp),
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null, modifier = Modifier.size(22.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Redo", style = MaterialTheme.typography.titleMedium)
                 }
             }
         }

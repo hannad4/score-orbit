@@ -20,6 +20,7 @@ sealed interface AppScreen {
     data object Settings : AppScreen
     data object PlayerSetup : AppScreen
     data object ScoreHistory : AppScreen
+    data object Leaderboard : AppScreen
 }
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
