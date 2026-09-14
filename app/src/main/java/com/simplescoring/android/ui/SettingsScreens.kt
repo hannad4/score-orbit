@@ -318,8 +318,8 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
-                        headlineContent = { Text("Keep Last Score Visible") },
-                        supportingContent = { Text("Flash the last change in the ring center") },
+                        headlineContent = { Text("Show Last Score") },
+                        supportingContent = { Text("Keep the last score visible until the next player scores") },
                         leadingContent = {
                             Icon(
                                 Icons.Default.Visibility,

@@ -204,20 +204,23 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     fun showFlash(color: Int, delta: Int, name: String) {
         // NOTE: like commitGesture, this runs from pointer-input and tap
         // handlers that may hold stale compositions: only State reads here.
-        if (!latestGame.keepLastVisible) return
         flashJob?.cancel()
         lastFlash = Triple(color, delta, name)
         flashAlpha = 1f
-        flashJob = scope.launch {
-            delay(1600)
-            animate(
-                initialValue = 1f,
-                targetValue = 0f,
-                animationSpec = tween(durationMillis = 400),
-            ) { value, _ -> flashAlpha = value }
-            lastFlash = null
-            flashJob = null
+        if (!latestGame.keepLastVisible) {
+            // Brief flash then fade ("off" = transient display)
+            flashJob = scope.launch {
+                delay(1600)
+                animate(
+                    initialValue = 1f,
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = 400),
+                ) { value, _ -> flashAlpha = value }
+                lastFlash = null
+                flashJob = null
+            }
         }
+        // "on" = persistent: flash stays until next scoring event
     }
 
     fun commitGesture() {
