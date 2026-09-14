@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.ManageAccounts
@@ -288,6 +289,25 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                             }
                         }
                     }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    ListItem(
+                        headlineContent = { Text("Enlarge Active Dot") },
+                        supportingContent = { Text("The spinning player's dot grows while scoring") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Circle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = game.enlargeActiveDot,
+                                onCheckedChange = { viewModel.setEnlargeActiveDot(it) },
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
                 }
             } else {
                 // No active game (just finished): offer a fresh one.

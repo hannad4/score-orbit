@@ -431,6 +431,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     trackPx = trackWidth,
                     trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     activeColor = activePlayer?.let { Color(it.color) },
+                    showMarker = game.enlargeActiveDot,
                     // Arc trails from the player's dot along the drag. Not
                     // clamped to one lap: RingDial itself turns anything
                     // beyond 360° into a stacked, full-circle fade instead of
@@ -764,6 +765,7 @@ private fun RingDial(
     trackPx: Float,
     trackColor: Color,
     activeColor: Color?,
+    showMarker: Boolean,
     arcStartDeg: Float,
     arcSweepDeg: Float,
 ) {
@@ -831,7 +833,9 @@ private fun RingDial(
 
             // Touch-marker disk: a bead riding the ring's channel at the
             // live input position, bigger than the track so it reads as the
-            // "now" point against the fading trail behind it.
+            // "now" point against the fading trail behind it. Gated by the
+            // "enlarge active dot" setting — off means a fixed-diameter dial.
+            if (!showMarker) return@Canvas
             val tipRad = tipDeg * PI.toFloat() / 180f
             drawCircle(
                 color = activeColor,

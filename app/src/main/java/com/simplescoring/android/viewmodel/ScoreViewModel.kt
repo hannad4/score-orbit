@@ -77,6 +77,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         boardName: String = "My Game",
         winMetric: WinMetric = WinMetric.HIGHEST,
         keepLastVisible: Boolean = true,
+        enlargeActiveDot: Boolean = false,
     ) {
         val count = playerCount.coerceIn(1, 12)
         val players = (0 until count).map { i ->
@@ -94,6 +95,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             winMetric = winMetric,
             allowNegative = true,
             keepLastVisible = keepLastVisible,
+            enlargeActiveDot = enlargeActiveDot,
             createdAt = System.currentTimeMillis(),
         )
         undoStack.clear()
@@ -112,6 +114,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             boardName = game.name,
             winMetric = game.winMetric,
             keepLastVisible = game.keepLastVisible,
+            enlargeActiveDot = game.enlargeActiveDot,
         )
     }
 
@@ -169,6 +172,10 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setKeepLastVisible(keep: Boolean) {
         _currentGame.value = _currentGame.value?.copy(keepLastVisible = keep)
+    }
+
+    fun setEnlargeActiveDot(enlarge: Boolean) {
+        _currentGame.value = _currentGame.value?.copy(enlargeActiveDot = enlarge)
     }
 
     fun setPlayerCount(count: Int) {
