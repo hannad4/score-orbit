@@ -179,6 +179,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     // final delta, fading out on its own after ~2s.
     var lastFlash by remember(game.id) { mutableStateOf<Triple<Int, Int, String>?>(null) }
     var flashAlpha by remember(game.id) { mutableFloatStateOf(0f) }
+    // Settle fade 0->1 after the rewind: bead fades out while the hidden
+    // dots fade back in, so nothing pops.
+    var settle by remember(game.id) { mutableFloatStateOf(0f) }
     var flashJob by remember(game.id) { mutableStateOf<Job?>(null) }
     // In-flight "spring back" animation that unwinds the dial after release.
     val scope = rememberCoroutineScope()
@@ -195,6 +198,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
         flashJob = null
         lastFlash = null
         flashAlpha = 0f
+        settle = 0f
         activeId = null
         pending = 0
         accRadians = 0f
@@ -265,7 +269,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     initialValue = start,
                     targetValue = home,
                     // Slow, stately rotary return: settling time scales with
-                    // 1/sqrt(stiffness), so ~30 takes roughly 7x as long as
+                    // 1/sqrt(stiffness), so ~70 takes roughly 4-5x as long as
                     // StiffnessMedium (1500) to settle.
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -273,6 +277,14 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     ),
                 ) { value, _ -> accRadians = value }
                 accRadians = 0f
+                // Smooth handoff instead of snapping to gray: fade the bead
+                // out while the hidden dots fade back in.
+                animate(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 300),
+                ) { value, _ -> settle = value }
+                settle = 0f
                 activeId = null
                 springJob = null
             }
@@ -439,6 +451,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     activeColor = activePlayer?.let { Color(it.color) },
                     showMarker = game.enlargeActiveDot,
+                    settleAlpha = settle,
                     // Arc trails from the player's dot along the drag. Not
                     // clamped to one lap: RingDial itself turns anything
                     // beyond 360° into a stacked, full-circle fade instead of
@@ -521,13 +534,14 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     // While dragging, the whole wheel of dots turns together
                     // with the touch (a real rotary dial's disk), rather than
                     // just the active player's own trail moving in place.
-                    // Only the spinning player's dot stays visible — the rest
-                    // get out of the way until the gesture ends.
-                    if (activeId != null && activeId != player.id) return@forEachIndexed
+                    // Idle dots hide for the spin and fade back in with the
+                    // settle animation instead of popping.
+                    val isActiveDot = activeId == null || activeId == player.id
                     val a = if (activeId != null) seatAngle(i, n) + accRadians else seatAngle(i, n)
                     SeatDot(
                         color = Color(player.color),
                         sizeDp = dp(dotD),
+                        alpha = if (isActiveDot) 1f else settle,
                         offsetPx = IntOffset(
                             x = (cx + cos(a).toFloat() * ringR - dotD / 2f).toInt(),
                             y = (cy + sin(a).toFloat() * ringR - dotD / 2f).toInt(),
@@ -778,6 +792,7 @@ private fun RingDial(
     trackColor: Color,
     activeColor: Color?,
     showMarker: Boolean,
+    settleAlpha: Float,
     arcStartDeg: Float,
     arcSweepDeg: Float,
 ) {
@@ -847,10 +862,13 @@ private fun RingDial(
             // live input position, bigger than the track so it reads as the
             // "now" point against the fading trail behind it. Gated by the
             // "enlarge active dot" setting — off means a fixed-diameter dial.
+            // Fades with the settle animation instead of popping out.
             if (!showMarker) return@Canvas
+            val beadAlpha = 1f - settleAlpha
+            if (beadAlpha <= 0f) return@Canvas
             val tipRad = tipDeg * PI.toFloat() / 180f
             drawCircle(
-                color = activeColor,
+                color = activeColor.copy(alpha = beadAlpha),
                 radius = trackPx * 0.7f,
                 center = Offset(
                     center.x + cos(tipRad) * ringRPx,
@@ -885,6 +903,7 @@ private fun trailFadeColors(color: Color, tipDeg: Float, clockwise: Boolean): Li
 private fun SeatDot(
     color: Color,
     sizeDp: Dp,
+    alpha: Float,
     offsetPx: IntOffset,
     onTap: () -> Unit,
 ) {
@@ -892,6 +911,7 @@ private fun SeatDot(
         modifier = Modifier
             .offset { offsetPx }
             .size(sizeDp)
+            .alpha(alpha)
             .clip(CircleShape)
             .background(color)
             .clickable(
