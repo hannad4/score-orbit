@@ -27,8 +27,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.simplescoring.android.model.Game
+import com.simplescoring.android.model.WinMetric
 import com.simplescoring.android.viewmodel.AppScreen
 import com.simplescoring.android.viewmodel.ScoreViewModel
+
+/** Medal tints for the top three ranks; null past third. */
+private fun medalFor(rank: Int): Color? = when (rank) {
+    1 -> Color(0xFFFFD54F)
+    2 -> Color(0xFFC0C0C0)
+    3 -> Color(0xFFCD7F32)
+    else -> null
+}
 
 /**
  * Player standings ordered highest score to lowest. Ties share a rank;
@@ -37,14 +46,21 @@ import com.simplescoring.android.viewmodel.ScoreViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
+    // Rank 1 means "winning": highest score normally, lowest score when
+    // the board plays lowest-wins. Ties share a rank.
+    val lowestWins = game.winMetric == WinMetric.LOWEST
     val standings = remember(game) {
         game.players
             .map { player -> player to game.currentScore(player.id) }
-            .sortedByDescending { (_, score) -> score }
+            .sortedWith(
+                if (lowestWins) compareBy { (_, score) -> score }
+                else compareByDescending { (_, score) -> score }
+            )
     }
-    // Standard competition ranking: same score shares a rank.
-    val ranks = remember(standings) {
-        standings.map { (_, score) -> standings.count { (_, s) -> s > score } + 1 }
+    val ranks = remember(standings, lowestWins) {
+        standings.map { (_, score) ->
+            standings.count { (_, s) -> if (lowestWins) s < score else s > score } + 1
+        }
     }
 
     Scaffold(
@@ -84,9 +100,11 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
                 items(standings.size) { index ->
                     val (player, score) = standings[index]
                     val rank = ranks[index]
+                    val medal = medalFor(rank)
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer
+                            containerColor = medal?.copy(alpha = 0.22f)
+                                ?: MaterialTheme.colorScheme.surfaceContainer
                         ),
                     ) {
                         ListItem(
@@ -102,7 +120,7 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
                                     "$rank",
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = medal ?: MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             },
                             trailingContent = {

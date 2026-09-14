@@ -156,9 +156,7 @@ fun ScoreHistoryScreen(game: Game, viewModel: ScoreViewModel) {
                         .weight(1f)
                         .height(64.dp),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Undo", style = MaterialTheme.typography.titleLarge)
+                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo", modifier = Modifier.size(28.dp))
                 }
                 FilledTonalButton(
                     enabled = canRedo,
@@ -167,9 +165,7 @@ fun ScoreHistoryScreen(game: Game, viewModel: ScoreViewModel) {
                         .weight(1f)
                         .height(64.dp),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Redo", style = MaterialTheme.typography.titleLarge)
+                    Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo", modifier = Modifier.size(28.dp))
                 }
             }
         }
