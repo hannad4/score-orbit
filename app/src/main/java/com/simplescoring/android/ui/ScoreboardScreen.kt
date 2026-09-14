@@ -258,13 +258,8 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
         val start = accRadians
         val home = if (start >= 0f) floor(start / twoPi) * twoPi
                    else ceil(start / twoPi) * twoPi
-        if (abs(start - home) < 0.05f) {
-            // Already (visually) home: nothing to unwind.
-            accRadians = 0f
-            activeId = null
-            springJob = null
-        } else {
-            springJob = scope.launch {
+        springJob = scope.launch {
+            if (abs(start - home) >= 0.05f) {
                 animate(
                     initialValue = start,
                     targetValue = home,
@@ -277,17 +272,21 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     ),
                 ) { value, _ -> accRadians = value }
                 accRadians = 0f
-                // Smooth handoff instead of snapping to gray: fade the bead
-                // out while the hidden dots fade back in.
-                animate(
-                    initialValue = 0f,
-                    targetValue = 1f,
-                    animationSpec = tween(durationMillis = 300),
-                ) { value, _ -> settle = value }
-                settle = 0f
-                activeId = null
-                springJob = null
+            } else {
+                // Already (visually) home: nothing to unwind.
+                accRadians = 0f
             }
+            // Smooth handoff instead of snapping to gray: fade the bead
+            // out while the hidden dots fade back in. Runs after every
+            // release — even tiny flicks — so nothing ever pops.
+            animate(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 300),
+            ) { value, _ -> settle = value }
+            settle = 0f
+            activeId = null
+            springJob = null
         }
     }
 
@@ -761,6 +760,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             showingPending -> "$pending"
                             else -> "${game.currentScore(player.id)}"
                         },
+                        showName = game.showPlayerNames,
                         scoreSp = scoreSp,
                         boxDp = dp(labelBoxPx),
                         dimmed = activeId != null && !isActive,
@@ -931,6 +931,7 @@ private fun SeatDot(
 private fun SeatScore(
     player: Player,
     text: String,
+    showName: Boolean,
     scoreSp: Float,
     boxDp: Dp,
     dimmed: Boolean,
@@ -954,14 +955,16 @@ private fun SeatScore(
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = player.name,
-                fontSize = (size * 0.24f).coerceAtLeast(10f).sp,
-                color = color,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-            )
+            if (showName) {
+                Text(
+                    text = player.name,
+                    fontSize = (size * 0.24f).coerceAtLeast(10f).sp,
+                    color = color,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
+            }
             Text(
                 text = text,
                 fontSize = size.sp,

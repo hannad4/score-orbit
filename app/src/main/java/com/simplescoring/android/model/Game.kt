@@ -34,6 +34,7 @@ data class Game(
     val allowNegative: Boolean = false,
     val keepLastVisible: Boolean = false,
     val enlargeActiveDot: Boolean = false,
+    val showPlayerNames: Boolean = true,
     val entries: List<ScoreEntry> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
     val finishedAt: Long? = null,

@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PlusOne
 import androidx.compose.material.icons.filled.Refresh
@@ -307,6 +308,25 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                             Switch(
                                 checked = game.keepLastVisible,
                                 onCheckedChange = { viewModel.setKeepLastVisible(it) },
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    ListItem(
+                        headlineContent = { Text("Show Player Names") },
+                        supportingContent = { Text("Display names beside scores") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Person,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = game.showPlayerNames,
+                                onCheckedChange = { viewModel.setShowPlayerNames(it) },
                             )
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
