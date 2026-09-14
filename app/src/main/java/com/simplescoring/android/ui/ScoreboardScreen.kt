@@ -306,11 +306,13 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Text(
-                        game.name,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    if (game.name.isNotBlank()) {
+                        Text(
+                            game.name,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 },
                 navigationIcon = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -349,7 +351,13 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
 
             // Ring sized for the narrow side; dots sit on it. Both run 15% slimmed
             // down from raw scale so the dial doesn't crowd the labels.
-            val ringR = minDim * 0.34f
+            // High counts get a slightly smaller dial so the label bands
+            // keep generous clearance instead of crowding the ring.
+            val ringR = minDim * when {
+                n <= 6 -> 0.34f
+                n <= 8 -> 0.32f
+                else -> 0.30f
+            }
             val share = (2 * PI.toFloat() * ringR / n) * 0.68f
             val dotD = (share.coerceIn(
                 with(density) { 34.dp.toPx() },
@@ -598,7 +606,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 val stackOffset = labelBoxPx + with(density) { 12.dp.toPx() }
                 // Minimum breathing room between a label and the ring/dots so
                 // crowded boards never read as clipped into the dial.
-                val labelClearPx = with(density) { 20.dp.toPx() }
+                val labelClearPx = with(density) { 28.dp.toPx() }
                 val manualAngles = manualLabelAngles(n)
                 if (n >= 7) {
                     val nearD = ringR + dotD / 2f + labelClearPx

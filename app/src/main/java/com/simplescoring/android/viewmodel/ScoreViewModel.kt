@@ -58,7 +58,6 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
                 colors = ScoreAnythingColors.PlayerColors.take(2),
                 rotationPoints = 10,
                 tapPoints = 0,
-                boardName = "My Game",
                 winMetric = WinMetric.HIGHEST,
             )
         }
@@ -76,7 +75,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         colors: List<Int>,
         rotationPoints: Int,
         tapPoints: Int,
-        boardName: String = "My Game",
+        boardName: String = "",
         winMetric: WinMetric = WinMetric.HIGHEST,
         keepLastVisible: Boolean = false,
         enlargeActiveDot: Boolean = false,
@@ -92,7 +91,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         _currentGame.value = Game(
-            name = boardName.ifBlank { "My Game" },
+            name = boardName,
             players = players,
             rotationPoints = rotationPoints.coerceIn(1, 100),
             tapPoints = tapPoints.coerceIn(0, 100),
