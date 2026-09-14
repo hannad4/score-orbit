@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Palette
@@ -542,11 +543,9 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                         // after focus and would clobber an immediate selection).
                         // Blank always saves back to the default, so model,
                         // box and hint can never disagree.
-                        var nameField by remember(player.id) {
-                            mutableStateOf(
-                                TextFieldValue(player.name.takeUnless { it == defaultName } ?: "")
-                            )
-                        }
+                    var nameField by remember(player.id) {
+                        mutableStateOf(TextFieldValue(player.name))
+                    }
                         val focusManager = LocalFocusManager.current
                         val scope = rememberCoroutineScope()
                         var selectJob by remember(player.id) { mutableStateOf<Job?>(null) }
@@ -557,14 +556,21 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                                 )
                             }
                         }
-                        TextField(
+                        OutlinedTextField(
                             value = nameField,
                             onValueChange = {
                                 nameField = it
                                 viewModel.renamePlayer(player.id, it.text.ifBlank { defaultName })
                             },
                             singleLine = true,
-                            placeholder = { Text(defaultName) },
+                            label = { Text(defaultName) },
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(
                                 onDone = { focusManager.clearFocus() }
@@ -586,7 +592,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                                     } else {
                                         selectJob?.cancel()
                                         if (nameField.text.isBlank()) {
-                                            nameField = TextFieldValue("")
+                                            nameField = TextFieldValue(defaultName)
                                         }
                                     }
                                 },

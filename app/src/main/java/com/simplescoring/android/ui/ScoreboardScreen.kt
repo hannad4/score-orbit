@@ -182,9 +182,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     // Settle fade 0->1 after the rewind: bead fades out while the hidden
     // dots fade back in, so nothing pops.
     var settle by remember(game.id) { mutableFloatStateOf(0f) }
-    // Slow trail dissolve 1->0 after settling: the sweep color eases back
-    // to gray instead of blinking out.
-    var trailDissolve by remember(game.id) { mutableFloatStateOf(1f) }
     // Marker grow 0->1 on grab (only when enlargement is on).
     var markerScale by remember(game.id) { mutableFloatStateOf(0f) }
     var markerJob by remember(game.id) { mutableStateOf<Job?>(null) }
@@ -207,8 +204,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
         lastFlash = null
         flashAlpha = 0f
         settle = 0f
-        trailDissolve = 1f
-        markerScale = 0f
         activeId = null
         pending = 0
         accRadians = 0f
@@ -288,24 +283,18 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 // Already (visually) home: nothing to unwind.
                 accRadians = 0f
             }
-            // Smooth handoff instead of snapping to gray, in two phases.
-            // Phase 1: the bead shrinks out while the hidden dots fade
-            // back in. Phase 2: the sweep color itself dissolves slowly
-            // back to the gray ring. Runs after every release — even tiny
-            // flicks — so nothing ever pops.
+            // One shared dissolve so dots, bead and trail move together:
+            // the hidden dots fade back in over the same ~0.9s that the
+            // bead and the sweep color fade out. Runs after every release
+            // — even tiny flicks — so nothing ever pops, and nothing ever
+            // finishes before anything else.
             animate(
                 initialValue = 0f,
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 350),
-            ) { value, _ -> settle = value }
-            animate(
-                initialValue = 1f,
-                targetValue = 0f,
                 animationSpec = tween(durationMillis = 900),
-            ) { value, _ -> trailDissolve = value }
+            ) { value, _ -> settle = value }
             accRadians = 0f
             settle = 0f
-            trailDissolve = 1f
             markerScale = 0f
             activeId = null
             springJob = null
@@ -489,7 +478,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     showMarker = game.enlargeActiveDot,
                     settleAlpha = settle,
                     markerScale = markerScale,
-                    trailAlpha = trailDissolve,
+                    trailAlpha = 1f - settle,
                     // Arc trails from the player's dot along the drag. Not
                     // clamped to one lap: RingDial itself turns anything
                     // beyond 360° into a stacked, full-circle fade instead of
