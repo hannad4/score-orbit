@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -148,27 +149,27 @@ fun ScoreHistoryScreen(game: Game, viewModel: ScoreViewModel) {
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                FilledTonalButton(
+                Button(
                     enabled = canUndo,
                     onClick = { viewModel.undo() },
                     modifier = Modifier
                         .weight(1f)
-                        .height(60.dp),
+                        .height(64.dp),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(22.dp))
+                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Undo", style = MaterialTheme.typography.titleMedium)
+                    Text("Undo", style = MaterialTheme.typography.titleLarge)
                 }
                 FilledTonalButton(
                     enabled = canRedo,
                     onClick = { viewModel.redo() },
                     modifier = Modifier
                         .weight(1f)
-                        .height(60.dp),
+                        .height(64.dp),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null, modifier = Modifier.size(22.dp))
+                    Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = null, modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Redo", style = MaterialTheme.typography.titleMedium)
+                    Text("Redo", style = MaterialTheme.typography.titleLarge)
                 }
             }
         }

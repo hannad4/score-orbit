@@ -12,13 +12,14 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -283,14 +284,16 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.go(AppScreen.ScoreHistory) }) {
-                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Score history")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { viewModel.go(AppScreen.ScoreHistory) }) {
+                            Icon(Icons.Default.History, contentDescription = "Score history")
+                        }
+                        IconButton(onClick = { viewModel.go(AppScreen.Leaderboard) }) {
+                            Icon(Icons.Default.Leaderboard, contentDescription = "Leaderboard")
+                        }
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.go(AppScreen.Leaderboard) }) {
-                        Icon(Icons.Default.Leaderboard, contentDescription = "Leaderboard")
-                    }
                     IconButton(onClick = { viewModel.go(AppScreen.Settings) }) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
