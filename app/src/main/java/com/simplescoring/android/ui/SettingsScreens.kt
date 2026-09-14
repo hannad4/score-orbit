@@ -26,10 +26,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PlusOne
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -81,6 +85,7 @@ import com.simplescoring.android.model.WinMetric
 import com.simplescoring.android.ui.theme.ScoreAnythingColors
 import com.simplescoring.android.viewmodel.AppScreen
 import com.simplescoring.android.viewmodel.ScoreViewModel
+import com.simplescoring.android.viewmodel.ThemeMode
 import kotlin.math.cos
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -128,21 +133,13 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 4.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            unfocusedIndicatorColor = Color.Transparent,
+                        ),
                     )
                     MiniScorePreview(game)
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    ListItem(
-                        headlineContent = { Text("Game History") },
-                        trailingContent = {
-                            Icon(
-                                Icons.Default.ChevronRight,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        modifier = Modifier.clickable { viewModel.go(AppScreen.GameHistory) },
-                    )
                 }
 
                 Button(
@@ -157,6 +154,13 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                 SettingsGroup(label = "Game setup") {
                     ListItem(
                         headlineContent = { Text("Number of Players") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Group,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
                         trailingContent = {
                             StepperControl(
                                 value = "${game.players.size}",
@@ -172,6 +176,13 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     ListItem(
                         headlineContent = { Text("Player Setup") },
                         supportingContent = { Text("${game.players.size} players") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.ManageAccounts,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
                         trailingContent = {
                             Icon(
                                 Icons.Default.ChevronRight,
@@ -186,6 +197,13 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     ListItem(
                         headlineContent = { Text("Score Step") },
                         supportingContent = { Text("Points per tap") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.PlusOne,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
                         trailingContent = {
                             StepperControl(
                                 value = "${game.step}",
@@ -200,6 +218,13 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
                         headlineContent = { Text("Keep Last Score Visible") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Visibility,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
                         trailingContent = {
                             Switch(
                                 checked = game.keepLastVisible,
@@ -232,6 +257,38 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         }
                     }
                 }
+
+                SettingsGroup(label = "Appearance") {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(
+                            "Theme",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val mode = viewModel.themeMode.value
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            ThemeMode.entries.forEachIndexed { i, entry ->
+                                SegmentedButton(
+                                    selected = mode == entry,
+                                    onClick = { viewModel.setThemeMode(entry) },
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = i,
+                                        count = ThemeMode.entries.size,
+                                    ),
+                                ) {
+                                    Text(
+                                        when (entry) {
+                                            ThemeMode.SYSTEM -> "System"
+                                            ThemeMode.LIGHT -> "Light"
+                                            ThemeMode.DARK -> "Dark"
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             } else {
                 // No active game (just finished): offer a fresh one.
                 Button(
@@ -241,9 +298,6 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Start a New Game")
-                }
-                TextButton(onClick = { viewModel.go(AppScreen.GameHistory) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Game History")
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -376,6 +430,14 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color(player.color))
+                                .clickable { paletteFor = player },
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
                         // Hint-style editing: untouched defaults live as an empty
                         // box with the default as the hint, so there is never
                         // any text to fight over — tapping just types. Custom
@@ -435,14 +497,10 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                             colors = TextFieldDefaults.colors(
                                 focusedTextColor = Color(player.color),
                                 unfocusedTextColor = Color(player.color),
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                unfocusedIndicatorColor = Color.Transparent,
                             ),
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(Color(player.color))
-                                .clickable { paletteFor = player },
                         )
                         if (game.players.size > 1) {
                             IconButton(onClick = { viewModel.removePlayer(player.id) }, modifier = Modifier.size(32.dp)) {
@@ -492,7 +550,7 @@ private fun RingPreview(players: List<Player>, modifier: Modifier = Modifier) {
         val cy = size.height / 2f
         val r = minOf(size.width, size.height) * 0.32f
         drawCircle(
-            color = Color(0xFF262626),
+            color = Color.Gray.copy(alpha = 0.35f),
             radius = r,
             center = Offset(cx, cy),
         )

@@ -22,14 +22,12 @@ import com.simplescoring.android.viewmodel.ScoreViewModel
 fun ScoreAnythingApp(viewModel: ScoreViewModel) {
     val screen by viewModel.screen
     val game by viewModel.currentGame
-    val history = viewModel.history
 
     BackHandler(enabled = screen != AppScreen.Board) {
         when (screen) {
             AppScreen.PlayerSetup -> viewModel.go(AppScreen.Settings)
             AppScreen.ScoreHistory -> viewModel.go(AppScreen.Board)
-            AppScreen.Settings, AppScreen.GameHistory ->
-                if (game != null) viewModel.go(AppScreen.Board)
+            AppScreen.Settings -> if (game != null) viewModel.go(AppScreen.Board)
             AppScreen.Board -> Unit
         }
     }
@@ -57,7 +55,7 @@ fun ScoreAnythingApp(viewModel: ScoreViewModel) {
                 AppScreen.Board -> {
                     val g = game
                     if (g != null) ScoreboardScreen(game = g, viewModel = viewModel)
-                    else GameHistoryScreen(history = history, currentGame = null, viewModel = viewModel)
+                    else SettingsScreen(game = null, viewModel = viewModel)
                 }
                 AppScreen.Settings -> SettingsScreen(game = game, viewModel = viewModel)
                 AppScreen.PlayerSetup -> {
@@ -68,9 +66,7 @@ fun ScoreAnythingApp(viewModel: ScoreViewModel) {
                 AppScreen.ScoreHistory -> {
                     val g = game
                     if (g != null) ScoreHistoryScreen(game = g, viewModel = viewModel)
-                    else GameHistoryScreen(history = history, currentGame = null, viewModel = viewModel)
                 }
-                AppScreen.GameHistory -> GameHistoryScreen(history = history, currentGame = game, viewModel = viewModel)
             }
         }
     }

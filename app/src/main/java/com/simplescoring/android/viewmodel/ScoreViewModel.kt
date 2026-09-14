@@ -1,6 +1,7 @@
 package com.simplescoring.android.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -10,7 +11,6 @@ import com.simplescoring.android.model.Player
 import com.simplescoring.android.model.Rotation
 import com.simplescoring.android.model.ScoreEntry
 import com.simplescoring.android.model.WinMetric
-import com.simplescoring.android.repository.GameRepository
 import com.simplescoring.android.ui.theme.ScoreAnythingColors
 import com.simplescoring.android.util.RotationUtils
 import java.util.UUID
@@ -20,12 +20,24 @@ sealed interface AppScreen {
     data object Settings : AppScreen
     data object PlayerSetup : AppScreen
     data object ScoreHistory : AppScreen
-    data object GameHistory : AppScreen
 }
+
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 class ScoreViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = GameRepository
+    private val prefs = application.getSharedPreferences("simple_scoring", Context.MODE_PRIVATE)
+
+    private val _themeMode = mutableStateOf(
+        runCatching { ThemeMode.valueOf(prefs.getString("theme_mode", ThemeMode.SYSTEM.name)!!) }
+            .getOrDefault(ThemeMode.SYSTEM)
+    )
+    val themeMode: State<ThemeMode> = _themeMode
+
+    fun setThemeMode(mode: ThemeMode) {
+        _themeMode.value = mode
+        prefs.edit().putString("theme_mode", mode.name).apply()
+    }
 
     private val _currentGame = mutableStateOf<Game?>(null)
     val currentGame: State<Game?> = _currentGame
@@ -33,12 +45,10 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     private val _screen = mutableStateOf<AppScreen>(AppScreen.Board)
     val screen: State<AppScreen> = _screen
 
-    val history = mutableStateListOf<Game>()
     val undoStack = mutableStateListOf<ScoreEntry>()
     val redoStack = mutableStateListOf<ScoreEntry>()
 
     init {
-        loadHistory()
         // Launch straight into a scoreboard.
         if (_currentGame.value == null) {
             startNewGame(
@@ -54,11 +64,6 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun go(screen: AppScreen) {
         _screen.value = screen
-    }
-
-    private fun loadHistory() {
-        history.clear()
-        history.addAll(repository.loadHistory())
     }
 
     // -- game lifecycle -----------------------------------------------------
@@ -107,35 +112,6 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             winMetric = game.winMetric,
             keepLastVisible = game.keepLastVisible,
         )
-    }
-
-    fun finishGame() {
-        val game = _currentGame.value ?: return
-        val winner = game.winner()
-        val finished = game.copy(finishedAt = System.currentTimeMillis(), winnerId = winner?.id)
-        repository.appendGame(finished)
-        _currentGame.value = null
-        undoStack.clear()
-        redoStack.clear()
-        loadHistory()
-        _screen.value = AppScreen.GameHistory
-    }
-
-    fun resumeGame(game: Game) {
-        _currentGame.value = game.copy(finishedAt = null, winnerId = null)
-        undoStack.clear()
-        redoStack.clear()
-        _screen.value = AppScreen.Board
-    }
-
-    fun deleteGame(game: Game) {
-        repository.deleteGame(game.id)
-        loadHistory()
-    }
-
-    fun clearHistory() {
-        repository.clearHistory()
-        loadHistory()
     }
 
     // -- scoring ------------------------------------------------------------

@@ -3,17 +3,14 @@ package com.simplescoring.android
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModelProvider
 import com.simplescoring.android.viewmodel.ScoreViewModel
-import com.simplescoring.android.repository.GameRepository
+import com.simplescoring.android.viewmodel.ThemeMode
 import com.simplescoring.android.ui.ScoreAnythingApp
 import com.simplescoring.android.ui.theme.ScoreAnythingTheme
 
@@ -34,13 +31,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize repository with application context before composing UI
-        GameRepository.init(applicationContext)
-
         enableEdgeToEdge()
 
         setContent {
-            ScoreAnythingTheme {
+            val themeMode by viewModel.themeMode
+            val systemDark = isSystemInDarkTheme()
+            val darkTheme = when (themeMode) {
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+                ThemeMode.SYSTEM -> systemDark
+            }
+            ScoreAnythingTheme(darkTheme = darkTheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     ScoreAnythingApp(viewModel = viewModel)
                 }

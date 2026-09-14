@@ -8,9 +8,7 @@ import com.simplescoring.android.model.Player
 import com.simplescoring.android.model.Rotation
 import com.simplescoring.android.model.ScoreEntry
 import com.simplescoring.android.model.WinMetric
-import com.simplescoring.android.ui.GameHistoryScreen
-import com.simplescoring.android.ui.PlayerSetupScreen
-import com.simplescoring.android.ui.ScoreHistoryScreen
+import com.simplescoring.android.ui.PlayerSetupScreenimport com.simplescoring.android.ui.ScoreHistoryScreen
 import com.simplescoring.android.ui.ScoreboardScreen
 import com.simplescoring.android.ui.SettingsScreen
 import com.simplescoring.android.ui.theme.ScoreAnythingColors
@@ -98,17 +96,4 @@ class ScreenshotsTest {
         }
     }
 
-    @Test
-    fun gameHistory() {
-        val game = demoGame()
-        paparazzi.snapshot {
-            ScoreAnythingTheme(dynamicColor = false) {
-                GameHistoryScreen(
-                    history = listOf(game, game.copy(id = "g2", name = "Rematch")),
-                    currentGame = game,
-                    viewModel = stubViewModel(),
-                )
-            }
-        }
-    }
 }
