@@ -271,7 +271,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         stiffness = 70f,
                     ),
                 ) { value, _ -> accRadians = value }
-                accRadians = 0f
+                // NOTE: accRadians deliberately stays at home (rotation-
+                // equivalent to zero) through the fade below, so the trail
+                // keeps its full final sweep to dissolve from.
             } else {
                 // Already (visually) home: nothing to unwind.
                 accRadians = 0f
@@ -817,7 +819,12 @@ private fun RingDial(
         )
         if (activeColor != null) {
             val tipDeg = arcStartDeg + arcSweepDeg
-            if (arcSweepDeg != 0f) {
+            // Settle fade for the whole trail (not just the bead): after a
+            // multi-turn spin the sweep stays past 360° through the entire
+            // rewind, so without this the full colored ring would blink out
+            // in a single frame at release instead of dissolving to gray.
+            val fade = 1f - settleAlpha
+            if (arcSweepDeg != 0f && fade > 0f) {
                 // Comet trail: full opacity at the touch point, fading to
                 // 10% one full turn behind it. Sampled as a sweep gradient
                 // fixed in absolute canvas angle (not rotated to the moving
@@ -834,6 +841,7 @@ private fun RingDial(
                         brush = trailBrush,
                         radius = ringRPx,
                         center = center,
+                        alpha = fade,
                         style = Stroke(width = trackPx),
                     )
                 } else {
@@ -853,6 +861,7 @@ private fun RingDial(
                         useCenter = false,
                         topLeft = Offset(center.x - ringRPx, center.y - ringRPx),
                         size = Size(ringRPx * 2f, ringRPx * 2f),
+                        alpha = fade,
                         style = Stroke(width = trackPx, cap = StrokeCap.Round),
                     )
                 }
