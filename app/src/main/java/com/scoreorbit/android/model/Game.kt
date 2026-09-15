@@ -36,7 +36,7 @@ data class Game(
     val enlargeActiveDot: Boolean = false,
     val showPlayerNames: Boolean = true,
     val hapticsEnabled: Boolean = false,
-    val hapticStrength: Int = 8,
+    val hapticStrength: Int = 80,
     val entries: List<ScoreEntry> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
     val finishedAt: Long? = null,

@@ -361,8 +361,8 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                             Slider(
                                 value = game.hapticStrength.toFloat(),
                                 onValueChange = { viewModel.setHapticStrength(it.toInt()) },
-                                valueRange = 1f..10f,
-                                steps = 8,
+                                valueRange = 0f..100f,
+                                steps = 99,
                             )
                         }
                     }

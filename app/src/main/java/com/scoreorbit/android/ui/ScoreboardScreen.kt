@@ -300,14 +300,14 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 accRadians = 0f
             }
             // One shared dissolve so dots, bead and trail move together:
-            // the hidden dots fade back in over the same ~0.9s that the
+            // the hidden dots fade back in over the same window that the
             // bead and the sweep color fade out. Runs after every release
             // — even tiny flicks — so nothing ever pops, and nothing ever
             // finishes before anything else.
             animate(
                 initialValue = 0f,
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 900),
+                animationSpec = tween(durationMillis = 1035),
             ) { value, _ -> settle = value }
             accRadians = 0f
             settle = 0f
@@ -1002,9 +1002,9 @@ private fun SeatScore(
             if (showName) {
                 Text(
                     text = player.name,
-                    // Large enough to read at 12 players, but always one
-                    // weight below the Bold score itself.
-                    fontSize = (size * 0.32f).coerceAtLeast(11f).sp,
+                    // Name-to-score ratio mirrors the reference layout;
+                    // always one weight below the Bold score itself.
+                    fontSize = (size * 0.36f).coerceAtLeast(11f).sp,
                     fontWeight = FontWeight.SemiBold,
                     color = color,
                     maxLines = 1,

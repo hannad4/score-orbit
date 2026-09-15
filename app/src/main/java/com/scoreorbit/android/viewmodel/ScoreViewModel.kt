@@ -81,7 +81,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         enlargeActiveDot: Boolean = false,
         showPlayerNames: Boolean = true,
         hapticsEnabled: Boolean = false,
-        hapticStrength: Int = 8,
+        hapticStrength: Int = 80,
     ) {
         val count = playerCount.coerceIn(1, 12)
         val players = (0 until count).map { i ->
@@ -203,7 +203,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setHapticStrength(level: Int) {
-        _currentGame.value = _currentGame.value?.copy(hapticStrength = level.coerceIn(1, 10))
+        _currentGame.value = _currentGame.value?.copy(hapticStrength = level.coerceIn(0, 100))
     }
 
     fun setPlayerCount(count: Int) {
