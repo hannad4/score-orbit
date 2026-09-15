@@ -317,16 +317,28 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 navigationIcon = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = { viewModel.go(AppScreen.ScoreHistory) }) {
-                            Icon(Icons.Default.History, contentDescription = "Score history")
+                            Icon(
+                                Icons.Default.History,
+                                contentDescription = "Score history",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         IconButton(onClick = { viewModel.go(AppScreen.Leaderboard) }) {
-                            Icon(Icons.Default.Leaderboard, contentDescription = "Leaderboard")
+                            Icon(
+                                Icons.Default.Leaderboard,
+                                contentDescription = "Leaderboard",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.go(AppScreen.Settings) }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 },
             )
@@ -457,7 +469,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 val p = (accRadians / (2f * PI.toFloat()) * turn).roundToInt()
                                 if (p != pending) {
                                     pending = p
-                                    buzz(ctx, 6)
+                                    if (latestGame.hapticsEnabled) buzz(ctx, 6)
                                 }
                             }
                         )
@@ -570,7 +582,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             y = (cy + sin(a).toFloat() * ringR - dotD / 2f).toInt(),
                         ),
                         onTap = {
-                            buzz(ctx, 12)
+                            if (game.hapticsEnabled) buzz(ctx, 12)
                             viewModel.addScore(player.id, game.tapPoints)
                             showFlash(player.color, game.tapPoints, player.name)
                         },
@@ -597,25 +609,27 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 val labelClearPx = with(density) { 28.dp.toPx() }
                 val manualAngles = manualLabelAngles(n)
                 if (n >= 7) {
-                    // Fixed 3-column band grid per half: seats walk left to
-                    // right in rows of up to 3, short rows centered so columns
-                    // stay aligned across rows. Wide cells let scores fill the
-                    // free space instead of squeezing into per-seat columns.
+                    // Fixed 3-column band grid in player order: the first
+                    // half of the players fills the top band left to right,
+                    // top to bottom (P1 top-left, P2 top-middle, ...), the
+                    // rest fill the bottom band the same way. Short rows are
+                    // centered so columns stay aligned across rows. Wide
+                    // cells let scores fill the free space instead of
+                    // squeezing into per-seat columns.
                     val nearD = ringR + dotD / 2f + labelClearPx
                     val rowPitch = labelBoxPx + with(density) { 12.dp.toPx() }
                     val xLo = edgeMarginPx + labelBoxPx / 2f
                     val xHi = wPx - edgeMarginPx - labelBoxPx / 2f
                     val anchors = floatArrayOf(xLo, (xLo + xHi) / 2f, xHi)
-                    // Deepest band on this board, for vertical fit.
-                    for (top in booleanArrayOf(true, false)) {
-                        val half = (0 until n)
-                            .filter { (sin(seatAngle(it, n)) <= 0.0) == top }
-                            .sortedBy { cos(seatAngle(it, n)) }
-                        val sign = if (top) -1f else 1f
-                        // Fit each half's own rows: a half with fewer rows
+                    val topCount = (n + 1) / 2
+                    for ((band, sign) in listOf(
+                        (0 until topCount).toList() to -1f,
+                        (topCount until n).toList() to 1f,
+                    )) {
+                        // Fit each band's own rows: a band with fewer rows
                         // keeps full clearance instead of inheriting the
-                        // compression of a more crowded half.
-                        val rows = half.chunked(3)
+                        // compression of a more crowded band.
+                        val rows = band.chunked(3)
                         val vRoom = (min(cy, hPx - cy) - edgeMarginPx - labelBoxPx / 2f)
                             .coerceAtLeast(0f)
                         val vWant = nearD + (rows.size - 1) * rowPitch + labelBoxPx / 2f
@@ -628,8 +642,12 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 2 -> floatArrayOf(anchors[0], anchors[2])
                                 else -> floatArrayOf(anchors[1])
                             }
+                            // Top band fills outward (first chunk farthest)
+                            // so P1 lands top-left; bottom band fills
+                            // downward in the same reading order.
+                            val rr = if (sign < 0f) rows.size - 1 - r else r
                             row.forEachIndexed { c, i ->
-                                val d = (nearD + r * rowPitch + labelBoxPx / 2f) * vFit
+                                val d = (nearD + rr * rowPitch + labelBoxPx / 2f) * vFit
                                 labelPositions[i] = Offset(xs[c], cy + sign * d)
                             }
                         }
@@ -766,7 +784,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             y = (pos.y - labelBoxPx / 2f).toInt(),
                         ),
                         onTap = {
-                            buzz(ctx, 10)
+                            if (game.hapticsEnabled) buzz(ctx, 10)
                             viewModel.rotatePlayer(player.id)
                         },
                     )

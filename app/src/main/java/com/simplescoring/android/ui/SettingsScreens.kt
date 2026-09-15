@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.PlusOne
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -135,7 +136,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     OutlinedTextField(
                         value = game.name,
                         onValueChange = { viewModel.setBoardName(it) },
-                        label = { Text("Scoreboard name") },
+                        label = { Text("Scoreboard Name") },
                         singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -328,6 +329,25 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                             Switch(
                                 checked = game.showPlayerNames,
                                 onCheckedChange = { viewModel.setShowPlayerNames(it) },
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    ListItem(
+                        headlineContent = { Text("Haptics") },
+                        supportingContent = { Text("Buzz on every full turn") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Vibration,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = game.hapticsEnabled,
+                                onCheckedChange = { viewModel.setHapticsEnabled(it) },
                             )
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),

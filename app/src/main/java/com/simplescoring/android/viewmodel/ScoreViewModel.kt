@@ -80,6 +80,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         keepLastVisible: Boolean = false,
         enlargeActiveDot: Boolean = false,
         showPlayerNames: Boolean = true,
+        hapticsEnabled: Boolean = true,
     ) {
         val count = playerCount.coerceIn(1, 12)
         val players = (0 until count).map { i ->
@@ -100,6 +101,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             keepLastVisible = keepLastVisible,
             enlargeActiveDot = enlargeActiveDot,
             showPlayerNames = showPlayerNames,
+            hapticsEnabled = hapticsEnabled,
             createdAt = System.currentTimeMillis(),
         )
         undoStack.clear()
@@ -121,6 +123,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             keepLastVisible = game.keepLastVisible,
             enlargeActiveDot = game.enlargeActiveDot,
             showPlayerNames = game.showPlayerNames,
+            hapticsEnabled = game.hapticsEnabled,
         )
     }
 
@@ -190,6 +193,10 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setShowPlayerNames(show: Boolean) {
         _currentGame.value = _currentGame.value?.copy(showPlayerNames = show)
+    }
+
+    fun setHapticsEnabled(enabled: Boolean) {
+        _currentGame.value = _currentGame.value?.copy(hapticsEnabled = enabled)
     }
 
     fun setPlayerCount(count: Int) {
