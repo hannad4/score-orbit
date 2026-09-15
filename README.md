@@ -3,7 +3,8 @@
 An Android-native scorekeeper for board games and casual play. Every player
 is a colored dot on a ring, scores sit out by the screen edges facing their
 player, and points are kept with a circular rotary-dial gesture that unwinds
-with a spring return.
+with a spring return. Inspired by the iOS Score Anything scorekeeper app
+([App Store listing](https://apps.apple.com/us/app/score-anything-scorekeeper/id1541777240)).
 
 ## Features
 
