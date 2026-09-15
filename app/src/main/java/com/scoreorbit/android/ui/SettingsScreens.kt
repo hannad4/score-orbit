@@ -532,6 +532,13 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {
+                    // Explicit confirmation path: everything already saves
+                    // as you type, so Done just steps back to Settings.
+                    TextButton(onClick = { viewModel.go(AppScreen.Settings) }) {
+                        Text("Done")
+                    }
+                },
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -553,6 +560,13 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            Text(
+                "Changes apply instantly",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
             // Mini ring preview.
             RingPreview(players = game.players, modifier = Modifier.align(Alignment.CenterHorizontally))
 
