@@ -336,14 +336,14 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             Icon(
                                 Icons.Default.History,
                                 contentDescription = "Score history",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             )
                         }
                         IconButton(onClick = { viewModel.go(AppScreen.Leaderboard) }) {
                             Icon(
                                 Icons.Default.Leaderboard,
                                 contentDescription = "Leaderboard",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             )
                         }
                     }
@@ -353,7 +353,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         Icon(
                             Icons.Default.Settings,
                             contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         )
                     }
                 },
