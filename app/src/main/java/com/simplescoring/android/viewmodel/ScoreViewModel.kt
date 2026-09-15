@@ -80,7 +80,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         keepLastVisible: Boolean = false,
         enlargeActiveDot: Boolean = false,
         showPlayerNames: Boolean = true,
-        hapticsEnabled: Boolean = true,
+        hapticsEnabled: Boolean = false,
     ) {
         val count = playerCount.coerceIn(1, 12)
         val players = (0 until count).map { i ->

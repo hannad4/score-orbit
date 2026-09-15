@@ -278,44 +278,6 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
-                        headlineContent = { Text("Enlarge Active Dot") },
-                        supportingContent = { Text("Temporarily enlarge the dot for the currently scoring player") },
-                        leadingContent = {
-                            Icon(
-                                Icons.Default.Circle,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        trailingContent = {
-                            Switch(
-                                checked = game.enlargeActiveDot,
-                                onCheckedChange = { viewModel.setEnlargeActiveDot(it) },
-                            )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    ListItem(
-                        headlineContent = { Text("Show Last Score") },
-                        supportingContent = { Text("Keep the last score visible until the next player scores") },
-                        leadingContent = {
-                            Icon(
-                                Icons.Default.Visibility,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        trailingContent = {
-                            Switch(
-                                checked = game.keepLastVisible,
-                                onCheckedChange = { viewModel.setKeepLastVisible(it) },
-                            )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    ListItem(
                         headlineContent = { Text("Show Player Names") },
                         supportingContent = { Text("Display names beside scores") },
                         leadingContent = {
@@ -335,6 +297,25 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
+                        headlineContent = { Text("Enlarge Active Dot") },
+                        supportingContent = { Text("Temporarily enlarge the dot for the currently scoring player") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Circle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = game.enlargeActiveDot,
+                                onCheckedChange = { viewModel.setEnlargeActiveDot(it) },
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    ListItem(
                         headlineContent = { Text("Haptics") },
                         supportingContent = { Text("Buzz on every full turn") },
                         leadingContent = {
@@ -348,6 +329,25 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                             Switch(
                                 checked = game.hapticsEnabled,
                                 onCheckedChange = { viewModel.setHapticsEnabled(it) },
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    ListItem(
+                        headlineContent = { Text("Show Last Score") },
+                        supportingContent = { Text("Keep the last score visible until the next player scores") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Visibility,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = game.keepLastVisible,
+                                onCheckedChange = { viewModel.setKeepLastVisible(it) },
                             )
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),

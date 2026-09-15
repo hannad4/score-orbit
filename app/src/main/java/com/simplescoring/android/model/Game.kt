@@ -35,7 +35,7 @@ data class Game(
     val keepLastVisible: Boolean = false,
     val enlargeActiveDot: Boolean = false,
     val showPlayerNames: Boolean = true,
-    val hapticsEnabled: Boolean = true,
+    val hapticsEnabled: Boolean = false,
     val entries: List<ScoreEntry> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
     val finishedAt: Long? = null,

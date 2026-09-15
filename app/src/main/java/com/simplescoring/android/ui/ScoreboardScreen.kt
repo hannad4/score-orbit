@@ -90,12 +90,28 @@ private fun seatAngle(index: Int, total: Int): Double {
     return origin + index * 2.0 * PI / total
 }
 
+/**
+ * Dial angle for a player's dot. Small tables space dots evenly around the
+ * whole ring; crowded tables (band layout) gather each band's dots onto its
+ * own half so the dots sit behind their scores: first band across the top
+ * (PI..2PI), second band across the bottom (0..PI).
+ */
+private fun dotAngle(index: Int, total: Int): Double {
+    if (total < 7) return seatAngle(index, total)
+    val topCount = (total + 1) / 2
+    return if (index < topCount) {
+        PI + (index + 0.5) * PI / topCount
+    } else {
+        ((index - topCount) + 0.5) * PI / (total - topCount)
+    }
+}
+
 private fun nearestSeat(point: Offset, center: Offset, total: Int): Int {
     val a = atan2((point.y - center.y).toDouble(), (point.x - center.x).toDouble())
     var best = 0
     var bestD = Double.MAX_VALUE
     for (i in 0 until total) {
-        var d = abs(a - seatAngle(i, total)) % (2 * PI)
+        var d = abs(a - dotAngle(i, total)) % (2 * PI)
         if (d > PI) d = 2 * PI - d
         if (d < bestD) {
             bestD = d
@@ -492,7 +508,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     // beyond 360° into a stacked, full-circle fade instead of
                     // truncating the visual at the first turn.
                     arcStartDeg = activeIndex.takeIf { it >= 0 }
-                        ?.let { (seatAngle(it, n) * 180.0 / PI).toFloat() } ?: -90f,
+                        ?.let { (dotAngle(it, n) * 180.0 / PI).toFloat() } ?: -90f,
                     arcSweepDeg = accRadians * 180f / PI.toFloat(),
                 )
 
@@ -572,7 +588,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     // Idle dots hide for the spin and fade back in with the
                     // settle animation instead of popping.
                     val isActiveDot = activeId == null || activeId == player.id
-                    val a = if (activeId != null) seatAngle(i, n) + accRadians else seatAngle(i, n)
+                    val a = if (activeId != null) dotAngle(i, n) + accRadians else dotAngle(i, n)
                     SeatDot(
                         color = Color(player.color),
                         sizeDp = dp(dotD),
