@@ -4,6 +4,8 @@ plugins {
     id("app.cash.paparazzi") version "1.3.5"
 }
 
+import java.io.File
+
 android {
     namespace = "com.scoreorbit.android"
     compileSdk = 34
@@ -12,16 +14,35 @@ android {
         applicationId = "com.scoreorbit.android"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
+        versionCode = 2
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+    }
+
+    // Release signing reads the local keystore created for this app
+    // (~/.local/share/score-orbit/, never committed). Fresh clones without
+    // it simply build unsigned release APKs.
+    val scoreOrbitHome = File(System.getProperty("user.home"), ".local/share/score-orbit")
+    val releaseKeystore = File(scoreOrbitHome, "score-orbit-release.jks")
+    signingConfigs {
+        create("release") {
+            storeFile = releaseKeystore
+            val pw = System.getenv("SCORE_ORBIT_KEY_PASSWORD")
+                ?: runCatching { File(scoreOrbitHome, "keystore-password.txt").readText().trim() }.getOrNull()
+            storePassword = pw
+            keyAlias = "scoreorbit"
+            keyPassword = pw
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (releaseKeystore.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

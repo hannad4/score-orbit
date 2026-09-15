@@ -307,7 +307,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             animate(
                 initialValue = 0f,
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 1035),
+                animationSpec = tween(durationMillis = 990),
             ) { value, _ -> settle = value }
             accRadians = 0f
             settle = 0f
