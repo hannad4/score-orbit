@@ -350,7 +350,6 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         // no drag physics to fight, and each tap previews
                         // itself immediately.
                         val levels = listOf(
-                            "Off" to 0,
                             "Low" to 35,
                             "Med" to 65,
                             "High" to 95,
