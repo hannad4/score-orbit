@@ -373,32 +373,20 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             // which eat into both screen dimensions at once — a smaller box
             // than the old n<=4 tier leaves real breathing room between the
             // box and the ring instead of pinning it right to the screen
-            // edge with almost no gap. 7+ players lay a crowded half of the
-            // wheel out as side-by-side columns (see the halfLayout below)
-            // instead, which needs the box to actually shrink as the widest
-            // half grows, or neighboring columns start to overlap. Rather
-            // than guess a static size per count, size it directly from the
-            // real screen width so it's as large as it can be while still
-            // leaving a small gap between columns.
+            // edge with almost no gap. 7+ players use a fixed 3-column band
+            // grid per half, so the box comes straight from the column
+            // width: as large as it can be while still fitting three across.
             val edgeMarginPx = with(density) { 8.dp.toPx() }
             val labelBoxPx = when {
                 n <= 3 -> with(density) { 140.dp.toPx() }
                 n <= 6 -> with(density) { 100.dp.toPx() }
                 else -> {
-                    val maxHalfK = (0 until n).groupBy { sin(seatAngle(it, n)) <= 0.0 }.values.maxOf { it.size }
-                    if (maxHalfK < 4) {
-                        with(density) { 100.dp.toPx() }
-                    } else {
-                        val usableWidth = wPx - 2 * edgeMarginPx
-                        val gap = with(density) { 4.dp.toPx() }
-                        // 4 columns (7-8 players) comfortably fits a 95dp
-                        // floor on a typical phone; 5-6 columns (9-12
-                        // players) can't without overlapping, so they stay
-                        // governed purely by the width-fit computation.
-                        val floor = with(density) { if (maxHalfK <= 4) 95.dp.toPx() else 56.dp.toPx() }
-                        ((usableWidth - gap * (maxHalfK - 1)) / maxHalfK)
-                            .coerceIn(floor, with(density) { 100.dp.toPx() })
-                    }
+                    // Band grid uses 3 fixed columns: size the box from the
+                    // column width so scores fill the free space instead of
+                    // squeezing into per-seat columns.
+                    val gap = with(density) { 4.dp.toPx() }
+                    ((wPx - 2 * edgeMarginPx - 2 * gap) / 3f)
+                        .coerceIn(with(density) { 72.dp.toPx() }, with(density) { 100.dp.toPx() })
                 }
             }
             val scoreSp = (labelBoxPx * 0.44f / density.density).coerceIn(20f, 64f)
@@ -609,67 +597,40 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 val labelClearPx = with(density) { 28.dp.toPx() }
                 val manualAngles = manualLabelAngles(n)
                 if (n >= 7) {
+                    // Fixed 3-column band grid per half: seats walk left to
+                    // right in rows of up to 3, short rows centered so columns
+                    // stay aligned across rows. Wide cells let scores fill the
+                    // free space instead of squeezing into per-seat columns.
                     val nearD = ringR + dotD / 2f + labelClearPx
-                    val farD = nearD + stackOffset
-                    val xMin = edgeMarginPx + labelBoxPx / 2f
-                    val xMax = wPx - edgeMarginPx - labelBoxPx / 2f
+                    val rowPitch = labelBoxPx + with(density) { 12.dp.toPx() }
+                    val xLo = edgeMarginPx + labelBoxPx / 2f
+                    val xHi = wPx - edgeMarginPx - labelBoxPx / 2f
+                    val anchors = floatArrayOf(xLo, (xLo + xHi) / 2f, xHi)
+                    // Deepest band on this board, for vertical fit.
                     for (top in booleanArrayOf(true, false)) {
-                        val half = (0 until n).filter { (sin(seatAngle(it, n)) <= 0.0) == top }
-                        if (half.size < 4) {
-                            for (i in half) {
-                                val a = seatAngle(i, n)
-                                val dirX = cos(a).toFloat()
-                                val dirY = sin(a).toFloat()
-                                val dotX = cx + dirX * ringR
-                                val dotY = cy + dirY * ringR
-                                if (abs(dirX) >= cos(40 * PI / 180).toFloat()) {
-                                    // Side seat: no room for a full label box
-                                    // further out on the ray — it would land
-                                    // on top of its own dot. Stack vertically
-                                    // off the dot instead (up for top-half
-                                    // seats, down for bottom-half ones).
-                                    val above = sin(a) <= 0.0
-                                    val y = dotY + (if (above) -1f else 1f) *
-                                        (dotD / 2f + labelClearPx + labelBoxPx / 2f)
-                                    labelPositions[i] = Offset(dotX, y)
-                                    continue
-                                }
-                                val maxDist = rayToEdge(center, Offset(dirX, dirY), wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
-                                val dist = min(1.85f * ringR, maxDist).coerceAtLeast(nearD)
-                                labelPositions[i] = Offset(cx + dirX * dist, cy + dirY * dist)
+                        val half = (0 until n)
+                            .filter { (sin(seatAngle(it, n)) <= 0.0) == top }
+                            .sortedBy { cos(seatAngle(it, n)) }
+                        val sign = if (top) -1f else 1f
+                        // Fit each half's own rows: a half with fewer rows
+                        // keeps full clearance instead of inheriting the
+                        // compression of a more crowded half.
+                        val rows = half.chunked(3)
+                        val vRoom = (min(cy, hPx - cy) - edgeMarginPx - labelBoxPx / 2f)
+                            .coerceAtLeast(0f)
+                        val vWant = nearD + (rows.size - 1) * rowPitch + labelBoxPx / 2f
+                        val vFit = if (vWant > vRoom && vWant > 0f) {
+                            (vRoom / vWant).coerceIn(0.2f, 1f)
+                        } else 1f
+                        rows.forEachIndexed { r, row ->
+                            val xs = when (row.size) {
+                                3 -> anchors
+                                2 -> floatArrayOf(anchors[0], anchors[2])
+                                else -> floatArrayOf(anchors[1])
                             }
-                        } else {
-                            val ordered = half.sortedBy { cos(seatAngle(it, n)) }
-                            val k = ordered.size
-                            // Outer seats (by left-to-right order) sit in the
-                            // near row, inner ones in the far row for 4 (an
-                            // inverted "smile" — on review this read better
-                            // than outer-far); a strict zigzag from 5 up.
-                            val isFar = when (k) {
-                                4 -> booleanArrayOf(false, true, true, false)
-                                5 -> booleanArrayOf(true, false, true, false, true)
-                                else -> BooleanArray(k) { it % 2 == 0 }
-                            }
-                            val sign = if (top) -1f else 1f
-                            // Both rows push out an extra half box-height from
-                            // the centerline, so a fully split board (4+ on
-                            // both halves) doesn't read as one crowded band
-                            // straddling the middle of the screen.
-                            val centerlineClearance = labelBoxPx / 2f
-                            // Fit both rows into the room above/below the
-                            // ring: shrink them toward the dial
-                            // proportionally when the far row would leave the
-                            // screen, so labels never clip at the edges.
-                            val vRoom = (min(cy, hPx - cy) - edgeMarginPx - labelBoxPx / 2f)
-                                .coerceAtLeast(0f)
-                            val vWant = farD + centerlineClearance
-                            val vFit = if (vWant > vRoom && vWant > 0f) {
-                                (vRoom / vWant).coerceIn(0.2f, 1f)
-                            } else 1f
-                            ordered.forEachIndexed { j, i ->
-                                val x = xMin + j * (xMax - xMin) / (k - 1)
-                                val d = ((if (isFar[j]) farD else nearD) + centerlineClearance) * vFit
-                                labelPositions[i] = Offset(x, cy + sign * d)
+                            row.forEachIndexed { c, i ->
+                                val d = (nearD + r * rowPitch + labelBoxPx / 2f) * vFit
+                                labelPositions[i] = Offset(xs[c], cy + sign * d)
                             }
                         }
                     }
