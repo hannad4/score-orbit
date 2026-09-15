@@ -74,6 +74,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -346,6 +347,13 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         enter = fadeIn() + expandVertically(),
                         exit = fadeOut() + shrinkVertically(),
                     ) {
+                        // Drag position lives here — not in the game state —
+                        // so the thumb glides without recomposing the screen
+                        // on every pixel. Committed (plus a preview buzz) on
+                        // release only.
+                        var hapticSlider by remember(game.hapticStrength) {
+                            mutableFloatStateOf(game.hapticStrength.toFloat())
+                        }
                         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
@@ -355,21 +363,21 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                                     modifier = Modifier.weight(1f),
                                 )
                                 Text(
-                                    "${game.hapticStrength}",
+                                    "${hapticSlider.toInt()}",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
                             }
                             Slider(
-                                value = game.hapticStrength.toFloat(),
-                                onValueChange = { viewModel.setHapticStrength(it.toInt()) },
-                                // Live preview: feel the strength when the
-                                // thumb is released.
+                                value = hapticSlider,
+                                onValueChange = { hapticSlider = it },
                                 onValueChangeFinished = {
-                                    buzz(ctx, 40, game.hapticStrength)
+                                    val level = hapticSlider.toInt()
+                                    viewModel.setHapticStrength(level)
+                                    buzz(ctx, 40, level)
                                 },
                                 valueRange = 0f..100f,
-                                steps = 99,
+                                steps = 0,
                             )
                         }
                     }
