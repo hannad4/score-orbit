@@ -730,11 +730,11 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     val showingPending = isActive && pending != 0
                     SeatScore(
                         player = player,
-                        // While swiping, the score shows the live pending delta.
-                        text = when {
-                            showingPending && pending > 0 -> "+$pending"
-                            showingPending -> "$pending"
-                            else -> "${game.currentScore(player.id)}"
+                        // While swiping, the score shows the live total (current + pending).
+                        text = if (showingPending) {
+                            "${game.currentScore(player.id) + pending}"
+                        } else {
+                            "${game.currentScore(player.id)}"
                         },
                         showName = game.showPlayerNames,
                         scoreSp = scoreSp,
