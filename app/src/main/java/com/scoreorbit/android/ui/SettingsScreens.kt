@@ -85,6 +85,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextRange
@@ -113,6 +114,7 @@ import kotlin.math.sin
 fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
     var showRestartConfirm by remember { mutableStateOf(false) }
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val ctx = LocalContext.current
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -361,6 +363,11 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                             Slider(
                                 value = game.hapticStrength.toFloat(),
                                 onValueChange = { viewModel.setHapticStrength(it.toInt()) },
+                                // Live preview: feel the strength when the
+                                // thumb is released.
+                                onValueChangeFinished = {
+                                    buzz(ctx, 40, game.hapticStrength)
+                                },
                                 valueRange = 0f..100f,
                                 steps = 99,
                             )

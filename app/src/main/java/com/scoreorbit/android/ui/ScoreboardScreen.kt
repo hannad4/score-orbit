@@ -138,35 +138,6 @@ private fun findNearestAnchor(i: Int, n: Int, isSide: BooleanArray, topHalf: Boo
 }
 
 /**
- * Hand-placed label angles (degrees; 0 = screen right, 90 = down, matching
- * [seatAngle]'s convention) for [n] players, one per player index in order.
- * Used for 4-6 players only (7+ uses the top/bottom half layout instead —
- * see the ScoreboardScreen composable): with only 6 "roomy" compass spots
- * that don't crowd the central dial (the 4 diagonals plus straight up/down
- * — due left/right is always too tight against the ring on a phone), this
- * fills those spots first. Player dots on the ring stay evenly spaced
- * regardless — only the score labels use this layout — but the walk around
- * the 6 spots starts at whichever one seat 0's dot actually sits on, so a
- * label always lines up with its own dot: top-left for a multiple of 4 (see
- * [seatAngle]'s half-step shift), straight up otherwise.
- */
-private fun manualLabelAngles(n: Int): List<Double>? {
-    // Depth (0 or 1) of each of the 6 roomy compass slots, in fixed order
-    // [N, NE, SE, S, SW, NW].
-    val depths = when (n) {
-        4 -> intArrayOf(0, 1, 1, 0, 1, 1)
-        5 -> intArrayOf(1, 1, 1, 0, 1, 1)
-        6 -> intArrayOf(1, 1, 1, 1, 1, 1)
-        else -> return null
-    }
-    val slotAngle = doubleArrayOf(-90.0, -45.0, 45.0, 90.0, 135.0, -135.0) // N, NE, SE, S, SW, NW
-    val order = if (n % 4 == 0) intArrayOf(5, 0, 1, 2, 3, 4) else intArrayOf(0, 1, 2, 3, 4, 5)
-    val result = mutableListOf<Double>()
-    for (slot in order) if (depths[slot] >= 1) result += slotAngle[slot]
-    return result
-}
-
-/**
  * Distance from [center] along [dir] to the inside of the rect
  * [0, w]x[0, h] shrunk by [margin]. Used to push score labels out to the
  * screen edges for the tabletop layout.
@@ -397,13 +368,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             val trackWidth = dotD
 
             // Score boxes: rotation-proof squares, sized by player count.
-            // 4-6 players sit at diagonal corners (see manualLabelAngles),
-            // which eat into both screen dimensions at once — a smaller box
-            // than the old n<=4 tier leaves real breathing room between the
-            // box and the ring instead of pinning it right to the screen
-            // edge with almost no gap. 7+ players use a fixed 3-column band
-            // grid per half, so the box comes straight from the column
-            // width: as large as it can be while still fitting three across.
+            // Small counts use large boxes; 4+ players use the band grid
+            // below, so the box comes straight from the column width: as
+            // large as it can be while still fitting three across.
             val edgeMarginPx = with(density) { 8.dp.toPx() }
             val labelBoxPx = when {
                 n <= 3 -> with(density) { 140.dp.toPx() }
@@ -613,22 +580,13 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 // seatAngle-driven layout below (anchors at their natural
                 // rotary start point; side players stack off a same-half
                 // anchor, or off their own ring-edge spot when there isn't
-                // one). 4-6 players use the hand-placed compass layout from
-                // manualLabelAngles. 7+ players split into top/bottom halves
-                // (by each seat's own vertical direction) and, per half:
-                // fewer than 4 players still anchor along their own ray, same
-                // as 1-3 players; 4 or more spread out as evenly spaced
-                // columns across the screen — in the seats' left-to-right
-                // order, alternating a near row (just past the ring) and a
-                // far row (screen edge) — since a half that crowded usually
-                // has no natural anchor left to stack from.
+                // one). 4+ players use the player-order band grid instead.
                 val labelPositions = arrayOfNulls<Offset>(n)
                 val stackOffset = labelBoxPx + with(density) { 12.dp.toPx() }
                 // Minimum breathing room between a label and the ring/dots so
                 // crowded boards never read as clipped into the dial.
                 val labelClearPx = with(density) { 28.dp.toPx() }
-                val manualAngles = manualLabelAngles(n)
-                if (n >= 5) {
+                if (n >= 4) {
                     // Fixed 3-column band grid in player order: the first
                     // half of the players fills the top band left to right,
                     // top to bottom (P1 top-left, P2 top-middle, ...), the
@@ -671,30 +629,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 labelPositions[i] = Offset(xs[c], cy + sign * d)
                             }
                         }
-                    }
-                } else if (n == 4 && manualAngles != null) {
-                    val used = HashMap<Double, Int>()
-                    for (i in 0 until n) {
-                        val slotDeg = manualAngles[i]
-                        // Diagonal slots snap 45° clockwise onto the nearest
-                        // axis: a full label box can't sit on a diagonal ray
-                        // without covering its own dot (the screen corner
-                        // runs out before the box clears the dot), while the
-                        // axes have room to spare. This also lands labels
-                        // exactly where the default rotations face.
-                        val angleDeg = if (slotDeg % 90.0 != 0.0) slotDeg + 45.0 else slotDeg
-                        val a = angleDeg * PI / 180.0
-                        val dirX = cos(a).toFloat()
-                        val dirY = sin(a).toFloat()
-                        val maxDist = rayToEdge(center, Offset(dirX, dirY), wPx, hPx, edgeMarginPx + labelBoxPx / 2f)
-                        val dist = min(1.85f * ringR, maxDist)
-                            .coerceAtLeast(ringR + dotD / 2f + labelClearPx)
-                        val occurrence = used.getOrDefault(angleDeg, 0)
-                        used[angleDeg] = occurrence + 1
-                        // coerceAtMost keeps a doubled-up slot's outer occupant
-                        // from being pushed past the screen edge.
-                        val finalDist = (dist + stackOffset * occurrence).coerceAtMost(maxDist)
-                        labelPositions[i] = Offset(cx + dirX * finalDist, cy + dirY * finalDist)
                     }
                 } else {
                     // Anchors (valid, non-side positions) stay put on their
