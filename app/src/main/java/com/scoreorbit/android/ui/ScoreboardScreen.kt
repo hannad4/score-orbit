@@ -486,7 +486,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 if (p != pending) {
                                     pending = p
                                     if (latestGame.hapticsEnabled) {
-                                        buzz(ctx, 6, latestGame.hapticStrength)
+                                        buzz(ctx, 18, latestGame.hapticStrength)
                                     }
                                 }
                             }
@@ -601,7 +601,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         ),
                         onTap = {
                             if (game.hapticsEnabled) {
-                                buzz(ctx, 12, game.hapticStrength)
+                                buzz(ctx, 30, game.hapticStrength)
                             }
                             viewModel.addScore(player.id, game.tapPoints)
                             showFlash(player.color, game.tapPoints, player.name)
@@ -628,7 +628,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 // crowded boards never read as clipped into the dial.
                 val labelClearPx = with(density) { 28.dp.toPx() }
                 val manualAngles = manualLabelAngles(n)
-                if (n >= 7) {
+                if (n >= 5) {
                     // Fixed 3-column band grid in player order: the first
                     // half of the players fills the top band left to right,
                     // top to bottom (P1 top-left, P2 top-middle, ...), the
@@ -672,10 +672,17 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             }
                         }
                     }
-                } else if (manualAngles != null) {
+                } else if (n == 4 && manualAngles != null) {
                     val used = HashMap<Double, Int>()
                     for (i in 0 until n) {
-                        val angleDeg = manualAngles[i]
+                        val slotDeg = manualAngles[i]
+                        // Diagonal slots snap 45° clockwise onto the nearest
+                        // axis: a full label box can't sit on a diagonal ray
+                        // without covering its own dot (the screen corner
+                        // runs out before the box clears the dot), while the
+                        // axes have room to spare. This also lands labels
+                        // exactly where the default rotations face.
+                        val angleDeg = if (slotDeg % 90.0 != 0.0) slotDeg + 45.0 else slotDeg
                         val a = angleDeg * PI / 180.0
                         val dirX = cos(a).toFloat()
                         val dirY = sin(a).toFloat()
@@ -805,7 +812,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         ),
                         onTap = {
                             if (game.hapticsEnabled) {
-                                buzz(ctx, 10, game.hapticStrength)
+                                buzz(ctx, 20, game.hapticStrength)
                             }
                             viewModel.rotatePlayer(player.id)
                         },
