@@ -9,6 +9,7 @@ import com.scoreorbit.android.model.Player
 import com.scoreorbit.android.model.Rotation
 import com.scoreorbit.android.model.ScoreEntry
 import com.scoreorbit.android.model.WinMetric
+import com.scoreorbit.android.ui.LeaderboardScreen
 import com.scoreorbit.android.ui.PlayerSetupScreen
 import com.scoreorbit.android.ui.ScoreHistoryScreen
 import com.scoreorbit.android.ui.ScoreboardScreen
@@ -97,6 +98,16 @@ class ScreenshotsTest {
         paparazzi.snapshot {
             ScoreOrbitTheme(dynamicColor = false) {
                 ScoreHistoryScreen(game = game, viewModel = stubViewModel(game.entries.last()))
+            }
+        }
+    }
+
+    @Test
+    fun leaderboard() {
+        val game = demoGame()
+        paparazzi.snapshot {
+            ScoreOrbitTheme(dynamicColor = false) {
+                LeaderboardScreen(game = game, viewModel = stubViewModel())
             }
         }
     }
