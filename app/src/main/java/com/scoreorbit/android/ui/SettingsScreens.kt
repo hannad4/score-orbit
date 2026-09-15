@@ -16,6 +16,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,6 +53,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -551,9 +553,13 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                 actions = {
                     // Explicit confirmation path: everything already saves
                     // as you type, so Done just steps back to Settings.
-                    TextButton(onClick = { viewModel.go(AppScreen.Settings) }) {
-                        Text("Done")
+                    FilledTonalButton(
+                        onClick = { viewModel.go(AppScreen.Settings) },
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+                    ) {
+                        Text("Done", style = MaterialTheme.typography.titleSmall)
                     }
+                    Spacer(modifier = Modifier.width(4.dp))
                 },
                 scrollBehavior = scrollBehavior,
             )
