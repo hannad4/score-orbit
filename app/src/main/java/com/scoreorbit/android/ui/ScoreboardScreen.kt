@@ -486,7 +486,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 if (p != pending) {
                                     pending = p
                                     if (latestGame.hapticsEnabled) {
-                                        buzz(ctx, 6, hapticAmplitude(latestGame.hapticStrength))
+                                        buzz(ctx, 6, latestGame.hapticStrength)
                                     }
                                 }
                             }
@@ -601,7 +601,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         ),
                         onTap = {
                             if (game.hapticsEnabled) {
-                                buzz(ctx, 12, hapticAmplitude(game.hapticStrength))
+                                buzz(ctx, 12, game.hapticStrength)
                             }
                             viewModel.addScore(player.id, game.tapPoints)
                             showFlash(player.color, game.tapPoints, player.name)
@@ -805,7 +805,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         ),
                         onTap = {
                             if (game.hapticsEnabled) {
-                                buzz(ctx, 10, hapticAmplitude(game.hapticStrength))
+                                buzz(ctx, 10, game.hapticStrength)
                             }
                             viewModel.rotatePlayer(player.id)
                         },
@@ -1002,7 +1002,10 @@ private fun SeatScore(
             if (showName) {
                 Text(
                     text = player.name,
-                    fontSize = (size * 0.24f).coerceAtLeast(10f).sp,
+                    // Large enough to read at 12 players, but always one
+                    // weight below the Bold score itself.
+                    fontSize = (size * 0.32f).coerceAtLeast(11f).sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = color,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

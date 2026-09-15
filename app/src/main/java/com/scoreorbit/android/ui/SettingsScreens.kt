@@ -1,5 +1,10 @@
 package com.scoreorbit.android.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -334,35 +339,32 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     )
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "Haptic Strength",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = if (game.hapticsEnabled) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                "${game.hapticStrength}",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (game.hapticsEnabled) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
+                    AnimatedVisibility(
+                        visible = game.hapticsEnabled,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically(),
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "Haptic Strength",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text(
+                                    "${game.hapticStrength}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                            Slider(
+                                value = game.hapticStrength.toFloat(),
+                                onValueChange = { viewModel.setHapticStrength(it.toInt()) },
+                                valueRange = 1f..10f,
+                                steps = 8,
                             )
                         }
-                        Slider(
-                            value = game.hapticStrength.toFloat(),
-                            onValueChange = { viewModel.setHapticStrength(it.toInt()) },
-                            valueRange = 1f..5f,
-                            steps = 3,
-                            enabled = game.hapticsEnabled,
-                        )
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(

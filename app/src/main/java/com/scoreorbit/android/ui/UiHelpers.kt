@@ -5,19 +5,19 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 
-fun buzz(ctx: Context, millis: Long, amplitude: Int = 255) {
+fun buzz(ctx: Context, millis: Long, level: Int = 10) {
     try {
         val v = ctx.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return
+        // Strength level 1..10 drives both amplitude and duration, so the
+        // top end hits clearly harder than a bare max-amplitude blip.
+        val clamped = level.coerceIn(1, 10)
+        val amplitude = (clamped * 25.5f).toInt().coerceIn(1, 255)
+        val scaledMillis = (millis * (0.5f + clamped * 0.1f)).toLong().coerceAtLeast(1L)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Full amplitude by default: the system default reads as a
-            // whisper on most devices, which defeats tactile dial feedback.
-            v.vibrate(VibrationEffect.createOneShot(millis, amplitude.coerceIn(1, 255)))
+            v.vibrate(VibrationEffect.createOneShot(scaledMillis, amplitude))
         } else {
             @Suppress("DEPRECATION")
-            v.vibrate(millis)
+            v.vibrate(scaledMillis)
         }
     } catch (_: Exception) { }
 }
-
-/** Settings level 1..5 mapped onto a vibration amplitude. */
-fun hapticAmplitude(level: Int): Int = (level.coerceIn(1, 5) * 51).coerceIn(1, 255)
