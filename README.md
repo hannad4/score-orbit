@@ -12,10 +12,15 @@ Set up 1–12 players with names and colors, pick how many points a full spin is
 
 Undo/redo is there for the usual "wait, that was supposed to go to Sofia" moments, there's a ledger of every entry, and a leaderboard that handles highest- or lowest-wins depending on the game.
 
-| | | |
-|---|---|---|
-| <img src="docs/board.png" width="250"> | <img src="docs/players.png" width="250"> | <img src="docs/settings.png" width="250"> |
-| <img src="docs/history.png" width="250"> | <img src="docs/leaderboard.png" width="250"> | |
+<p align="center">
+  <img src="docs/board.png" width="220" alt="The ring">
+  <img src="docs/players.png" width="220" alt="Set up players">
+  <img src="docs/settings.png" width="220" alt="Make it yours">
+</p>
+<p align="center">
+  <img src="docs/history.png" width="220" alt="Every point">
+  <img src="docs/leaderboard.png" width="220" alt="Who's winning">
+</p>
 
 Small stuff that matters: light/dark/system theme with dynamic color, haptic feedback with adjustable strength, Material 3 Expressive throughout.
 
