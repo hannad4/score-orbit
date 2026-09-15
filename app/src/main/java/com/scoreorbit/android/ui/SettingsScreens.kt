@@ -63,7 +63,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -74,7 +73,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -102,6 +100,7 @@ import com.scoreorbit.android.ui.theme.ScoreOrbitColors
 import com.scoreorbit.android.viewmodel.AppScreen
 import com.scoreorbit.android.viewmodel.ScoreViewModel
 import com.scoreorbit.android.viewmodel.ThemeMode
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -347,38 +346,41 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         enter = fadeIn() + expandVertically(),
                         exit = fadeOut() + shrinkVertically(),
                     ) {
-                        // Drag position lives here — not in the game state —
-                        // so the thumb glides without recomposing the screen
-                        // on every pixel. Committed (plus a preview buzz) on
-                        // release only.
-                        var hapticSlider by remember(game.hapticStrength) {
-                            mutableFloatStateOf(game.hapticStrength.toFloat())
-                        }
-                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    "Haptic Strength",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                Text(
-                                    "${hapticSlider.toInt()}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
-                            Slider(
-                                value = hapticSlider,
-                                onValueChange = { hapticSlider = it },
-                                onValueChangeFinished = {
-                                    val level = hapticSlider.toInt()
-                                    viewModel.setHapticStrength(level)
-                                    buzz(ctx, 40, level)
-                                },
-                                valueRange = 0f..100f,
-                                steps = 0,
+                        // Discrete strength levels like the Theme control:
+                        // no drag physics to fight, and each tap previews
+                        // itself immediately.
+                        val levels = listOf(
+                            "Off" to 0,
+                            "Low" to 35,
+                            "Med" to 65,
+                            "High" to 95,
+                        )
+                        val selected =
+                            levels.minByOrNull { (_, value) -> abs(value - game.hapticStrength) }?.first
+                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                            Text(
+                                "Haptic Strength",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                levels.forEachIndexed { i, (label, value) ->
+                                    SegmentedButton(
+                                        selected = selected == label,
+                                        onClick = {
+                                            viewModel.setHapticStrength(value)
+                                            buzz(ctx, 40, value)
+                                        },
+                                        shape = SegmentedButtonDefaults.itemShape(
+                                            index = i,
+                                            count = levels.size,
+                                        ),
+                                    ) {
+                                        Text(label)
+                                    }
+                                }
+                            }
                         }
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
