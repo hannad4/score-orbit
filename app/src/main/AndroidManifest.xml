@@ -5,11 +5,11 @@
         android:allowBackup="true"        android:label="@string/app_name"        android:supportsRtl="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:theme="@style/Theme.SimpleScoring">
+        android:theme="@style/Theme.ScoreOrbit">
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.SimpleScoring">
+            android:theme="@style/Theme.ScoreOrbit">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

@@ -1,4 +1,4 @@
-package com.simplescoring.android.ui
+package com.scoreorbit.android.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -43,9 +43,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.simplescoring.android.model.Game
-import com.simplescoring.android.viewmodel.AppScreen
-import com.simplescoring.android.viewmodel.ScoreViewModel
+import com.scoreorbit.android.model.Game
+import com.scoreorbit.android.viewmodel.AppScreen
+import com.scoreorbit.android.viewmodel.ScoreViewModel
 
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-package com.simplescoring.android.ui
+package com.scoreorbit.android.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,10 +26,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.simplescoring.android.model.Game
-import com.simplescoring.android.model.WinMetric
-import com.simplescoring.android.viewmodel.AppScreen
-import com.simplescoring.android.viewmodel.ScoreViewModel
+import com.scoreorbit.android.model.Game
+import com.scoreorbit.android.model.WinMetric
+import com.scoreorbit.android.viewmodel.AppScreen
+import com.scoreorbit.android.viewmodel.ScoreViewModel
 
 /** Medal tints for the top three ranks; null past third. */
 private fun medalFor(rank: Int): Color? = when (rank) {

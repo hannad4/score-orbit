@@ -1,4 +1,4 @@
-# Simple Scoring
+# Score Orbit
 
 An Android-native scorekeeper for board games and casual play. Every player
 is a colored dot on a ring, scores sit out by the screen edges facing their
@@ -15,7 +15,7 @@ The tabletop look: dark board, tonal menus.
 | --- | --- | --- |
 | ![iPhone scoreboard](docs/ios-scoreboard.png) | ![iPhone swipe scoring](docs/ios-swipe.png) | ![iPhone setup](docs/ios-settings.png) |
 
-Get it from the [v0.3-iphone release](https://github.com/hannad4/simple-scoring/releases/tag/v0.3-iphone).
+Get it from the [v0.3-iphone release](https://github.com/hannad4/score-orbit/releases/tag/v0.3-iphone).
 
 ## Material Expressive theme
 
@@ -27,7 +27,7 @@ light mode that follows the OS theme.
 | --- | --- | --- |
 | ![Scoreboard](docs/board.png) | ![Settings](docs/settings.png) | ![Score history](docs/history.png) |
 
-Get it from the [v0.4 release](https://github.com/hannad4/simple-scoring/releases/tag/v0.4).
+Get it from the [v0.4 release](https://github.com/hannad4/score-orbit/releases/tag/v0.4).
 
 ## Features
 
@@ -40,7 +40,7 @@ Get it from the [v0.4 release](https://github.com/hannad4/simple-scoring/release
 ## Technical
 
 Android Kotlin + Jetpack Compose (Material 3).
-Package: `com.simplescoring.android`
+Package: `com.scoreorbit.android`
 
 ## Build
 

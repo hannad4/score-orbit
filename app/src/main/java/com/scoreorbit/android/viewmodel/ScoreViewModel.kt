@@ -1,4 +1,4 @@
-package com.simplescoring.android.viewmodel
+package com.scoreorbit.android.viewmodel
 
 import android.app.Application
 import android.content.Context
@@ -6,13 +6,13 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
-import com.simplescoring.android.model.Game
-import com.simplescoring.android.model.Player
-import com.simplescoring.android.model.Rotation
-import com.simplescoring.android.model.ScoreEntry
-import com.simplescoring.android.model.WinMetric
-import com.simplescoring.android.ui.theme.ScoreAnythingColors
-import com.simplescoring.android.util.RotationUtils
+import com.scoreorbit.android.model.Game
+import com.scoreorbit.android.model.Player
+import com.scoreorbit.android.model.Rotation
+import com.scoreorbit.android.model.ScoreEntry
+import com.scoreorbit.android.model.WinMetric
+import com.scoreorbit.android.ui.theme.ScoreOrbitColors
+import com.scoreorbit.android.util.RotationUtils
 import java.util.UUID
 
 sealed interface AppScreen {
@@ -55,7 +55,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             startNewGame(
                 playerCount = 2,
                 names = listOf("Player 1", "Player 2"),
-                colors = ScoreAnythingColors.PlayerColors.take(2),
+                colors = ScoreOrbitColors.PlayerColors.take(2),
                 rotationPoints = 10,
                 tapPoints = 0,
                 winMetric = WinMetric.HIGHEST,
@@ -81,13 +81,14 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         enlargeActiveDot: Boolean = false,
         showPlayerNames: Boolean = true,
         hapticsEnabled: Boolean = false,
+        hapticStrength: Int = 5,
     ) {
         val count = playerCount.coerceIn(1, 12)
         val players = (0 until count).map { i ->
             Player(
                 id = UUID.randomUUID().toString(),
                 name = names.getOrElse(i) { "Player ${i + 1}" }.ifBlank { "Player ${i + 1}" },
-                color = colors.getOrElse(i) { ScoreAnythingColors.PlayerColors[i % ScoreAnythingColors.PlayerColors.size] },
+                color = colors.getOrElse(i) { ScoreOrbitColors.PlayerColors[i % ScoreOrbitColors.PlayerColors.size] },
                 rotation = Rotation.NONE,
             )
         }
@@ -102,6 +103,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             enlargeActiveDot = enlargeActiveDot,
             showPlayerNames = showPlayerNames,
             hapticsEnabled = hapticsEnabled,
+            hapticStrength = hapticStrength,
             createdAt = System.currentTimeMillis(),
         )
         undoStack.clear()
@@ -124,6 +126,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             enlargeActiveDot = game.enlargeActiveDot,
             showPlayerNames = game.showPlayerNames,
             hapticsEnabled = game.hapticsEnabled,
+            hapticStrength = game.hapticStrength,
         )
     }
 
@@ -199,6 +202,10 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         _currentGame.value = _currentGame.value?.copy(hapticsEnabled = enabled)
     }
 
+    fun setHapticStrength(level: Int) {
+        _currentGame.value = _currentGame.value?.copy(hapticStrength = level.coerceIn(1, 5))
+    }
+
     fun setPlayerCount(count: Int) {
         val game = _currentGame.value ?: return
         val target = count.coerceIn(1, 12)
@@ -253,7 +260,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun nextFreeColor(used: List<Int>, index: Int): Int {
-        val palette = ScoreAnythingColors.PlayerColors
+        val palette = ScoreOrbitColors.PlayerColors
         return palette.firstOrNull { it !in used } ?: palette[index % palette.size]
     }
 }

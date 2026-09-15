@@ -1,4 +1,4 @@
-package com.simplescoring.android.ui.theme
+package com.scoreorbit.android.ui.theme
 
 import android.app.Activity
 import android.os.Build
@@ -22,18 +22,18 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = ScoreAnythingColors.Accent,
-    onPrimary = ScoreAnythingColors.OnBackground,
-    primaryContainer = ScoreAnythingColors.Accent.copy(alpha = 0.3f),
-    secondary = ScoreAnythingColors.WinnerGold,
-    onSecondary = ScoreAnythingColors.BackgroundDark,
-    tertiary = ScoreAnythingColors.Accent,
-    background = ScoreAnythingColors.BackgroundDark,
-    onBackground = ScoreAnythingColors.OnBackground,
-    surface = ScoreAnythingColors.SurfaceDark,
-    onSurface = ScoreAnythingColors.OnSurface,
-    surfaceVariant = ScoreAnythingColors.SurfaceDark,
-    onSurfaceVariant = ScoreAnythingColors.OnSurface.copy(alpha = 0.7f),
+    primary = ScoreOrbitColors.Accent,
+    onPrimary = ScoreOrbitColors.OnBackground,
+    primaryContainer = ScoreOrbitColors.Accent.copy(alpha = 0.3f),
+    secondary = ScoreOrbitColors.WinnerGold,
+    onSecondary = ScoreOrbitColors.BackgroundDark,
+    tertiary = ScoreOrbitColors.Accent,
+    background = ScoreOrbitColors.BackgroundDark,
+    onBackground = ScoreOrbitColors.OnBackground,
+    surface = ScoreOrbitColors.SurfaceDark,
+    onSurface = ScoreOrbitColors.OnSurface,
+    surfaceVariant = ScoreOrbitColors.SurfaceDark,
+    onSurfaceVariant = ScoreOrbitColors.OnSurface.copy(alpha = 0.7f),
 )
 
 /**
@@ -81,7 +81,7 @@ object ExpressiveMotion {
 }
 
 @Composable
-fun ScoreAnythingTheme(
+fun ScoreOrbitTheme(
     // Follows the OS theme by default (see MainActivity); the board keeps
     // fixed game colors so player dots always read true. On Android 12+
     // the menus use Material You dynamic color.

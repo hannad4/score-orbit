@@ -1,4 +1,4 @@
-package com.simplescoring.android.ui
+package com.scoreorbit.android.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -58,6 +58,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -87,13 +88,13 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.simplescoring.android.model.Game
-import com.simplescoring.android.model.Player
-import com.simplescoring.android.model.WinMetric
-import com.simplescoring.android.ui.theme.ScoreAnythingColors
-import com.simplescoring.android.viewmodel.AppScreen
-import com.simplescoring.android.viewmodel.ScoreViewModel
-import com.simplescoring.android.viewmodel.ThemeMode
+import com.scoreorbit.android.model.Game
+import com.scoreorbit.android.model.Player
+import com.scoreorbit.android.model.WinMetric
+import com.scoreorbit.android.ui.theme.ScoreOrbitColors
+import com.scoreorbit.android.viewmodel.AppScreen
+import com.scoreorbit.android.viewmodel.ScoreViewModel
+import com.scoreorbit.android.viewmodel.ThemeMode
 import kotlin.math.cos
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -333,6 +334,36 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     )
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Haptic Strength",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = if (game.hapticsEnabled) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                "${game.hapticStrength}",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (game.hapticsEnabled) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
+                        Slider(
+                            value = game.hapticStrength.toFloat(),
+                            onValueChange = { viewModel.setHapticStrength(it.toInt()) },
+                            valueRange = 1f..5f,
+                            steps = 3,
+                            enabled = game.hapticsEnabled,
+                        )
+                    }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
                         headlineContent = { Text("Show Last Score") },
@@ -360,7 +391,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         viewModel.startNewGame(
                             2,
                             listOf("Player 1", "Player 2"),
-                            ScoreAnythingColors.PlayerColors.take(2),
+                            ScoreOrbitColors.PlayerColors.take(2),
                             rotationPoints = 10,
                             tapPoints = 0,
                         )
@@ -703,7 +734,7 @@ private fun ColorPaletteDialog(selected: Int, onPick: (Int) -> Unit, onDismiss: 
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                ScoreAnythingColors.PlayerColors.forEach { c ->
+                ScoreOrbitColors.PlayerColors.forEach { c ->
                     Box(
                         modifier = Modifier
                             .size(40.dp)

@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "SimpleScoring"
+rootProject.name = "ScoreOrbit"
 include(":app")

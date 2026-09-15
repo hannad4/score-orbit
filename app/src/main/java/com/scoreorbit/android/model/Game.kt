@@ -1,4 +1,4 @@
-package com.simplescoring.android.model
+package com.scoreorbit.android.model
 
 data class Player(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -36,6 +36,7 @@ data class Game(
     val enlargeActiveDot: Boolean = false,
     val showPlayerNames: Boolean = true,
     val hapticsEnabled: Boolean = false,
+    val hapticStrength: Int = 5,
     val entries: List<ScoreEntry> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
     val finishedAt: Long? = null,

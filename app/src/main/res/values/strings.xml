@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Simple Scoring</string>
+    <string name="app_name">Score Orbit</string>
     <string name="new_game_label">New Game</string>
     <string name="game_name">Game Name</string>
     <string name="game_name_hint">e.g. Scrabble, Dominion, D&amp;D Session</string>

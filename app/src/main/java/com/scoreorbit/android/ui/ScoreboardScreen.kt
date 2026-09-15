@@ -1,4 +1,4 @@
-package com.simplescoring.android.ui
+package com.scoreorbit.android.ui
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
@@ -58,11 +58,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.simplescoring.android.model.Game
-import com.simplescoring.android.model.Player
-import com.simplescoring.android.util.RotationUtils
-import com.simplescoring.android.viewmodel.AppScreen
-import com.simplescoring.android.viewmodel.ScoreViewModel
+import com.scoreorbit.android.model.Game
+import com.scoreorbit.android.model.Player
+import com.scoreorbit.android.util.RotationUtils
+import com.scoreorbit.android.viewmodel.AppScreen
+import com.scoreorbit.android.viewmodel.ScoreViewModel
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -485,7 +485,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 val p = (accRadians / (2f * PI.toFloat()) * turn).roundToInt()
                                 if (p != pending) {
                                     pending = p
-                                    if (latestGame.hapticsEnabled) buzz(ctx, 6)
+                                    if (latestGame.hapticsEnabled) {
+                                        buzz(ctx, 6, hapticAmplitude(latestGame.hapticStrength))
+                                    }
                                 }
                             }
                         )
@@ -598,7 +600,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             y = (cy + sin(a).toFloat() * ringR - dotD / 2f).toInt(),
                         ),
                         onTap = {
-                            if (game.hapticsEnabled) buzz(ctx, 12)
+                            if (game.hapticsEnabled) {
+                                buzz(ctx, 12, hapticAmplitude(game.hapticStrength))
+                            }
                             viewModel.addScore(player.id, game.tapPoints)
                             showFlash(player.color, game.tapPoints, player.name)
                         },
@@ -800,7 +804,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             y = (pos.y - labelBoxPx / 2f).toInt(),
                         ),
                         onTap = {
-                            if (game.hapticsEnabled) buzz(ctx, 10)
+                            if (game.hapticsEnabled) {
+                                buzz(ctx, 10, hapticAmplitude(game.hapticStrength))
+                            }
                             viewModel.rotatePlayer(player.id)
                         },
                     )

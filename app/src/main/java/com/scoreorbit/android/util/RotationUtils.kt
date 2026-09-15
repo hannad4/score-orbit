@@ -1,6 +1,6 @@
-package com.simplescoring.android.util
+package com.scoreorbit.android.util
 
-import com.simplescoring.android.model.Rotation
+import com.scoreorbit.android.model.Rotation
 
 object RotationUtils {
     // Returns rotation angle in degrees for Compose Modifier.rotate()

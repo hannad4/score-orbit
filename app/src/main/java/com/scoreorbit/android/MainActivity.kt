@@ -1,4 +1,4 @@
-package com.simplescoring.android
+package com.scoreorbit.android
 
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -9,10 +9,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
-import com.simplescoring.android.viewmodel.ScoreViewModel
-import com.simplescoring.android.viewmodel.ThemeMode
-import com.simplescoring.android.ui.ScoreAnythingApp
-import com.simplescoring.android.ui.theme.ScoreAnythingTheme
+import com.scoreorbit.android.viewmodel.ScoreViewModel
+import com.scoreorbit.android.viewmodel.ThemeMode
+import com.scoreorbit.android.ui.ScoreOrbitApp
+import com.scoreorbit.android.ui.theme.ScoreOrbitTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -41,9 +41,9 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.DARK -> true
                 ThemeMode.SYSTEM -> systemDark
             }
-            ScoreAnythingTheme(darkTheme = darkTheme) {
+            ScoreOrbitTheme(darkTheme = darkTheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    ScoreAnythingApp(viewModel = viewModel)
+                    ScoreOrbitApp(viewModel = viewModel)
                 }
             }
         }

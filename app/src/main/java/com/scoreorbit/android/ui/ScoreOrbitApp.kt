@@ -1,4 +1,4 @@
-package com.simplescoring.android.ui
+package com.scoreorbit.android.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -14,12 +14,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.simplescoring.android.ui.theme.ExpressiveMotion
-import com.simplescoring.android.viewmodel.AppScreen
-import com.simplescoring.android.viewmodel.ScoreViewModel
+import com.scoreorbit.android.ui.theme.ExpressiveMotion
+import com.scoreorbit.android.viewmodel.AppScreen
+import com.scoreorbit.android.viewmodel.ScoreViewModel
 
 @Composable
-fun ScoreAnythingApp(viewModel: ScoreViewModel) {
+fun ScoreOrbitApp(viewModel: ScoreViewModel) {
     val screen by viewModel.screen
     val game by viewModel.currentGame
 

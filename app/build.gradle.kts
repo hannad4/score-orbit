@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.simplescoring.android"
+    namespace = "com.scoreorbit.android"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.simplescoring.android"
+        applicationId = "com.scoreorbit.android"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

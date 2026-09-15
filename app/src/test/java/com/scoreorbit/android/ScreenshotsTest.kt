@@ -1,22 +1,22 @@
-package com.simplescoring.android
+package com.scoreorbit.android
 
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import app.cash.paparazzi.DeviceConfig.Companion.PIXEL_5
 import app.cash.paparazzi.Paparazzi
-import com.simplescoring.android.model.Game
-import com.simplescoring.android.model.Player
-import com.simplescoring.android.model.Rotation
-import com.simplescoring.android.model.ScoreEntry
-import com.simplescoring.android.model.WinMetric
-import com.simplescoring.android.ui.PlayerSetupScreen
-import com.simplescoring.android.ui.ScoreHistoryScreen
-import com.simplescoring.android.ui.ScoreboardScreen
-import com.simplescoring.android.ui.SettingsScreen
-import com.simplescoring.android.ui.theme.ScoreAnythingColors
-import com.simplescoring.android.ui.theme.ScoreAnythingTheme
-import com.simplescoring.android.viewmodel.ScoreViewModel
-import com.simplescoring.android.viewmodel.ThemeMode
+import com.scoreorbit.android.model.Game
+import com.scoreorbit.android.model.Player
+import com.scoreorbit.android.model.Rotation
+import com.scoreorbit.android.model.ScoreEntry
+import com.scoreorbit.android.model.WinMetric
+import com.scoreorbit.android.ui.PlayerSetupScreen
+import com.scoreorbit.android.ui.ScoreHistoryScreen
+import com.scoreorbit.android.ui.ScoreboardScreen
+import com.scoreorbit.android.ui.SettingsScreen
+import com.scoreorbit.android.ui.theme.ScoreOrbitColors
+import com.scoreorbit.android.ui.theme.ScoreOrbitTheme
+import com.scoreorbit.android.viewmodel.ScoreViewModel
+import com.scoreorbit.android.viewmodel.ThemeMode
 import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mockito
@@ -28,7 +28,7 @@ class ScreenshotsTest {
     val paparazzi = Paparazzi(deviceConfig = PIXEL_5)
 
     private fun demoGame(): Game {
-        val colors = ScoreAnythingColors.PlayerColors
+        val colors = ScoreOrbitColors.PlayerColors
         val players = listOf(
             Player(id = "p1", name = "Joey", color = colors[4], rotation = Rotation.ROTATED_270),
             Player(id = "p2", name = "Stu", color = colors[2], rotation = Rotation.NONE),
@@ -65,7 +65,7 @@ class ScreenshotsTest {
     fun board() {
         val game = demoGame()
         paparazzi.snapshot {
-            ScoreAnythingTheme(dynamicColor = false) {
+            ScoreOrbitTheme(dynamicColor = false) {
                 ScoreboardScreen(game = game, viewModel = stubViewModel())
             }
         }
@@ -75,7 +75,7 @@ class ScreenshotsTest {
     fun settings() {
         val game = demoGame()
         paparazzi.snapshot {
-            ScoreAnythingTheme(dynamicColor = false) {
+            ScoreOrbitTheme(dynamicColor = false) {
                 SettingsScreen(game = game, viewModel = stubViewModel())
             }
         }
@@ -85,7 +85,7 @@ class ScreenshotsTest {
     fun playerSetup() {
         val game = demoGame()
         paparazzi.snapshot {
-            ScoreAnythingTheme(dynamicColor = false) {
+            ScoreOrbitTheme(dynamicColor = false) {
                 PlayerSetupScreen(game = game, viewModel = stubViewModel())
             }
         }
@@ -95,7 +95,7 @@ class ScreenshotsTest {
     fun scoreHistory() {
         val game = demoGame()
         paparazzi.snapshot {
-            ScoreAnythingTheme(dynamicColor = false) {
+            ScoreOrbitTheme(dynamicColor = false) {
                 ScoreHistoryScreen(game = game, viewModel = stubViewModel(game.entries.last()))
             }
         }
