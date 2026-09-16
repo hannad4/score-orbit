@@ -74,6 +74,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -110,6 +111,17 @@ import kotlinx.coroutines.launch
 import kotlin.math.sin
 
 
+private val winMetrics = listOf(WinMetric.LOWEST, WinMetric.HIGHEST)
+
+// Discrete haptic strength levels (no drag physics to fight, each tap
+// previews itself immediately). Top-level so every recomposition doesn't
+// reallocate the list.
+private val hapticLevels = listOf(
+    "Low" to 35,
+    "Med" to 65,
+    "High" to 95,
+)
+
 /** Game settings: scoreboard identity, setup, and scoring rules. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,6 +129,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
     var showRestartConfirm by remember { mutableStateOf(false) }
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val ctx = LocalContext.current
+    val focusManager = LocalFocusManager.current
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -143,14 +156,35 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
         ) {
             if (game != null) {
                 SettingsGroup(label = "Game setup") {
+                    // Local text state: pushing every keystroke into the
+                    // viewmodel would rebuild this whole screen per character.
+                    // Commits on Done, focus loss, or leaving the screen.
+                    var boardNameField by remember(game.id) { mutableStateOf(game.name) }
+                    DisposableEffect(game.id) {
+                        onDispose {
+                            if (boardNameField != viewModel.currentGame.value?.name) {
+                                viewModel.setBoardName(boardNameField)
+                            }
+                        }
+                    }
                     OutlinedTextField(
-                        value = game.name,
-                        onValueChange = { viewModel.setBoardName(it) },
+                        value = boardNameField,
+                        onValueChange = { boardNameField = it },
                         label = { Text("Scoreboard Name") },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            if (boardNameField != game.name) viewModel.setBoardName(boardNameField)
+                            focusManager.clearFocus()
+                        }),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .onFocusChanged { focus ->
+                                if (!focus.isFocused && boardNameField != game.name) {
+                                    viewModel.setBoardName(boardNameField)
+                                }
+                            },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
@@ -239,14 +273,13 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            val metrics = listOf(WinMetric.LOWEST, WinMetric.HIGHEST)
-                            metrics.forEachIndexed { i, metric ->
+                            winMetrics.forEachIndexed { i, metric ->
                                 SegmentedButton(
                                     selected = game.winMetric == metric,
                                     onClick = { viewModel.setWinMetric(metric) },
                                     shape = SegmentedButtonDefaults.itemShape(
                                         index = i,
-                                        count = metrics.size,
+                                        count = winMetrics.size,
                                     ),
                                 ) {
                                     Text(if (metric == WinMetric.HIGHEST) "Highest" else "Lowest")
@@ -351,13 +384,8 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         // Discrete strength levels like the Theme control:
                         // no drag physics to fight, and each tap previews
                         // itself immediately.
-                        val levels = listOf(
-                            "Low" to 35,
-                            "Med" to 65,
-                            "High" to 95,
-                        )
                         val selected =
-                            levels.minByOrNull { (_, value) -> abs(value - game.hapticStrength) }?.first
+                            hapticLevels.minByOrNull { (_, value) -> abs(value - game.hapticStrength) }?.first
                         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                             Text(
                                 "Haptic Strength",
@@ -366,7 +394,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                                levels.forEachIndexed { i, (label, value) ->
+                                hapticLevels.forEachIndexed { i, (label, value) ->
                                     SegmentedButton(
                                         selected = selected == label,
                                         onClick = {
@@ -375,7 +403,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                                         },
                                         shape = SegmentedButtonDefaults.itemShape(
                                             index = i,
-                                            count = levels.size,
+                                            count = hapticLevels.size,
                                         ),
                                     ) {
                                         Text(label)
