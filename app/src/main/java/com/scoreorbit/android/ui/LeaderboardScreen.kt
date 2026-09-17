@@ -133,8 +133,7 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
                         ) {
                             ScoreListItem(
                                 playerName = player.name,
-                                supportingText = if (rank == 1) "Leader • $score pts"
-                                else "${rankLabel(rank)} place • $score pts",
+                                supportingText = null,
                                 trailingText = "$score",
                                 trailingColor = Color(player.color),
                                 leadingBadge = {

@@ -62,13 +62,6 @@ internal fun medalFor(rank: Int): Color? = when (rank) {
     else -> null
 }
 
-internal fun rankLabel(rank: Int): String = when (rank) {
-    1 -> "1st"
-    2 -> "2nd"
-    3 -> "3rd"
-    else -> "${rank}th"
-}
-
 // Shared leading badge for lists - consistent across leaderboard & history
 @Composable
 internal fun ListLeadingBadge(
@@ -168,7 +161,7 @@ internal fun EmptyState(
 @Composable
 internal fun ScoreListItem(
     playerName: String,
-    supportingText: String,
+    supportingText: String?,
     trailingText: String,
     trailingColor: Color,
     leadingBadge: @Composable () -> Unit,
@@ -182,12 +175,14 @@ internal fun ScoreListItem(
                 color = MaterialTheme.colorScheme.onSurface,
             )
         },
-        supportingContent = {
-            Text(
-                supportingText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        supportingContent = supportingText?.let { text ->
+            {
+                Text(
+                    text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         },
         leadingContent = leadingBadge,
         trailingContent = if (showTrailing) {

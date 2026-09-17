@@ -67,6 +67,7 @@ import com.scoreorbit.android.viewmodel.AppScreen
 import com.scoreorbit.android.viewmodel.ScoreViewModel
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.cos
@@ -93,27 +94,71 @@ private fun seatAngle(index: Int, total: Int): Double {
 }
 
 /**
- * Dial angle for a player's dot. Small tables space dots evenly around the
- * whole ring; crowded tables (band layout) gather each band's dots onto its
- * own half so the dots sit behind their scores: first band across the top
- * (PI..2PI), second band across the bottom (0..PI).
+ * Dial angles with one dot parked on the ray from the dial center toward
+ * its own score label, so each dot sits as close as possible to its score
+ * on any player count or layout. Labels that bunch up (e.g. stacked rows
+ * sharing a column) get their dots spread to the minimum non-overlapping
+ * separation, preserving circular order with minimal movement.
  */
-private fun dotAngle(index: Int, total: Int): Double {
-    if (total < 7) return seatAngle(index, total)
-    val topCount = (total + 1) / 2
-    return if (index < topCount) {
-        PI + (index + 0.5) * PI / topCount
-    } else {
-        ((index - topCount) + 0.5) * PI / (total - topCount)
+private fun computeDotAngles(
+    labelPositions: Array<Offset?>,
+    cx: Float,
+    cy: Float,
+    ringR: Float,
+    dotD: Float,
+): DoubleArray {
+    val n = labelPositions.size
+    // Candidate: ray from center through each label's final position.
+    val cand = DoubleArray(n) { i ->
+        val p = labelPositions[i]!!
+        var a = atan2((p.y - cy).toDouble(), (p.x - cx).toDouble())
+        if (a < 0) a += 2 * PI
+        a
     }
+    if (n < 2) return cand
+    // Minimum center-to-center separation (chord) so dots keep a small gap.
+    val minSep = 2.0 * asin(min(1.0, (dotD * 1.1 / 2.0) / ringR.toDouble()))
+    // Dots are sized from their angular share, so a full even spread always
+    // fits; if it somehow couldn't, fall back to even spacing to keep the
+    // dial usable.
+    if (minSep * n > 2 * PI) {
+        return DoubleArray(n) { -PI / 2 + it * 2 * PI / n }
+    }
+    // Unwrap candidates in circular order, then one forward push pass and
+    // one backward pull pass. Forward establishes the gaps; backward pulls
+    // everything back toward its candidate without breaking them, so drift
+    // stays minimal. Both passes preserve circular order.
+    val order = (0 until n).sortedBy { cand[it] }
+    val unwrapped = DoubleArray(n)
+    unwrapped[0] = cand[order[0]]
+    for (k in 1 until n) {
+        var target = cand[order[k]]
+        while (target < unwrapped[k - 1]) target += 2 * PI
+        unwrapped[k] = target
+    }
+    val placed = DoubleArray(n)
+    placed[0] = unwrapped[0]
+    for (k in 1 until n) {
+        placed[k] = maxOf(unwrapped[k], placed[k - 1] + minSep)
+    }
+    for (k in n - 2 downTo 0) {
+        placed[k] = minOf(placed[k], placed[k + 1] - minSep)
+    }
+    val result = DoubleArray(n)
+    for (k in order.indices) {
+        var a = placed[k] % (2 * PI)
+        if (a < 0) a += 2 * PI
+        result[order[k]] = a
+    }
+    return result
 }
 
-private fun nearestSeat(point: Offset, center: Offset, total: Int): Int {
+private fun nearestSeat(point: Offset, center: Offset, dotAngles: DoubleArray): Int {
     val a = atan2((point.y - center.y).toDouble(), (point.x - center.x).toDouble())
     var best = 0
     var bestD = Double.MAX_VALUE
-    for (i in 0 until total) {
-        var d = abs(a - dotAngle(i, total)) % (2 * PI)
+    for (i in dotAngles.indices) {
+        var d = abs(a - dotAngles[i]) % (2 * PI)
         if (d > PI) d = 2 * PI - d
         if (d < bestD) {
             bestD = d
@@ -304,6 +349,20 @@ private fun computeLabelPositions(
                 if (aboveOf[i]) anchorPos.y - totalOffset else anchorPos.y + totalOffset
             )
         }
+    }
+    // Final guard for every layout above: no label may leave the
+    // screen. Crowded boards overlap slightly instead of
+    // clipping cut-off text at the edges.
+    for (i in 0 until n) {
+        val p = positions[i] ?: continue
+        val loX = labelBoxPx / 2f + edgeMarginPx
+        val hiX = wPx - labelBoxPx / 2f - edgeMarginPx
+        val loY = labelBoxPx / 2f + edgeMarginPx
+        val hiY = hPx - labelBoxPx / 2f - edgeMarginPx
+        positions[i] = Offset(
+            x = if (hiX <= loX) wPx / 2f else p.x.coerceIn(loX, hiX),
+            y = if (hiY <= loY) hPx / 2f else p.y.coerceIn(loY, hiY),
+        )
     }
     return positions
 }
@@ -546,6 +605,23 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             }
             val scoreSp = (labelBoxPx * 0.44f / density.density).coerceIn(20f, 64f)
 
+            // Scores pushed out to the screen edges (memoized: pure layout
+            // math, independent of gesture state). 1-3 players use the
+            // seatAngle-driven layout (anchors at their natural rotary
+            // start point; side players stack off a same-half anchor, or
+            // off their own ring-edge spot when there isn't one). 4+
+            // players use the player-order band grid instead.
+            val labelPositions: Array<Offset?> = remember(
+                n, wPx, hPx, ringR, dotD, labelBoxPx, edgeMarginPx, density,
+            ) {
+                computeLabelPositions(n, wPx, hPx, cx, cy, ringR, dotD, labelBoxPx, edgeMarginPx, density)
+            }
+            // Dial angles, one dot parked on the ray toward its own score
+            // (memoized likewise; de-collided inside).
+            val dotAngles: DoubleArray = remember(labelPositions, cx, cy, ringR, dotD) {
+                computeDotAngles(labelPositions, cx, cy, ringR, dotD)
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -558,7 +634,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 // return animation instead of fighting it for control
                                 // of accRadians.
                                 resetGesture()
-                                val seat = nearestSeat(offset, center, g.players.size)
+                                val seat = nearestSeat(offset, center, dotAngles)
                                 activeId = g.players[seat].id
                                 // Grow the touch marker in on grab (only when
                                 // enlargement is on — otherwise it stays put).
@@ -637,7 +713,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     // beyond 360° into a stacked, full-circle fade instead of
                     // truncating the visual at the first turn.
                     arcStartDeg = activeIndex.takeIf { it >= 0 }
-                        ?.let { (dotAngle(it, n) * 180.0 / PI).toFloat() } ?: -90f,
+                        ?.let { (dotAngles[it] * 180.0 / PI).toFloat() } ?: -90f,
                     arcSweepDeg = accRadians * 180f / PI.toFloat(),
                 )
 
@@ -717,7 +793,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     // Idle dots hide for the spin and fade back in with the
                     // settle animation instead of popping.
                     val isActiveDot = activeId == null || activeId == player.id
-                    val a = if (activeId != null) dotAngle(i, n) + accRadians else dotAngle(i, n)
+                    val a = if (activeId != null) dotAngles[i] + accRadians else dotAngles[i]
                     SeatDot(
                         color = Color(player.color),
                         sizeDp = dp(dotD),
@@ -736,30 +812,10 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     )
                 }
 
-                // Scores pushed out to the screen edges (memoized: pure layout
-                // math, independent of gesture state). 1-3 players use the
-                // seatAngle-driven layout (anchors at their natural rotary
-                // start point; side players stack off a same-half anchor, or
-                // off their own ring-edge spot when there isn't one). 4+
-                // players use the player-order band grid instead.
-                val labelPositions: Array<Offset?> = remember(
-                    n, wPx, hPx, ringR, dotD, labelBoxPx, edgeMarginPx, density,
-                ) {
-                    computeLabelPositions(n, wPx, hPx, cx, cy, ringR, dotD, labelBoxPx, edgeMarginPx, density)
-                }
-
-                // Render all labels.
-                // Final guard for every layout above: no label may leave the
-                // screen. Crowded boards overlap slightly instead of
-                // clipping cut-off text at the edges.
-                fun clampAxis(v: Float, size: Float): Float {
-                    val lo = labelBoxPx / 2f + edgeMarginPx
-                    val hi = size - labelBoxPx / 2f - edgeMarginPx
-                    return if (hi <= lo) size / 2f else v.coerceIn(lo, hi)
-                }
+                // Render all labels (positions already clamped on-screen by
+                // computeLabelPositions).
                 game.players.forEachIndexed { i, player ->
-                    val raw = labelPositions[i]!!
-                    val pos = Offset(clampAxis(raw.x, wPx), clampAxis(raw.y, hPx))
+                    val pos = labelPositions[i]!!
                     val isActive = activeId == player.id
                     SeatScore(
                         player = player,
