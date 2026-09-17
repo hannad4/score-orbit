@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.scoreorbit.android.model.Game
 import com.scoreorbit.android.model.WinMetric
@@ -74,6 +75,11 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
         }
     }
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val subtitle = if (game.name.isNotBlank()) {
+        "${game.name} • ${if (lowestWins) "Lowest wins" else "Highest wins"}"
+    } else {
+        if (lowestWins) "Lowest wins" else "Highest wins"
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -81,11 +87,6 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
         topBar = {
             SharedTopAppBar(
                 title = "Leaderboard",
-                subtitle = if (game.name.isNotBlank()) {
-                    "${game.name} • ${if (lowestWins) "Lowest wins" else "Highest wins"}"
-                } else {
-                    if (lowestWins) "Lowest wins" else "Highest wins"
-                },
                 viewModel = viewModel,
                 scrollBehavior = scrollBehavior,
             )
@@ -96,6 +97,14 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            Text(
+                text = subtitle,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
             if (standings.isEmpty()) {
                 EmptyState(
                     icon = { Icon(Icons.Default.Leaderboard, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(36.dp)) },

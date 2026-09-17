@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scoreorbit.android.model.Game
@@ -224,20 +225,16 @@ internal fun ScoreCard(
 @Composable
 internal fun SharedTopAppBar(
     title: String,
-    subtitle: String,
     viewModel: ScoreViewModel,
     scrollBehavior: androidx.compose.material3.TopAppBarScrollBehavior,
 ) {
     MediumTopAppBar(
         title = {
-            Column {
-                Text(title)
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Text(
+                text = title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         },
         navigationIcon = {
             IconButton(onClick = { viewModel.go(AppScreen.Board) }) {
@@ -262,6 +259,11 @@ fun ScoreHistoryScreen(game: Game, viewModel: ScoreViewModel) {
     val canUndo = viewModel.undoStack.isNotEmpty()
     val canRedo = viewModel.redoStack.isNotEmpty()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val subtitle = if (game.name.isNotBlank()) {
+        "${game.name} • ${game.entries.size} ${if (game.entries.size == 1) "entry" else "entries"}"
+    } else {
+        "${game.entries.size} ${if (game.entries.size == 1) "entry" else "entries"}"
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -269,11 +271,6 @@ fun ScoreHistoryScreen(game: Game, viewModel: ScoreViewModel) {
         topBar = {
             SharedTopAppBar(
                 title = "Score History",
-                subtitle = if (game.name.isNotBlank()) {
-                    "${game.name} • ${game.entries.size} ${if (game.entries.size == 1) "entry" else "entries"}"
-                } else {
-                    "${game.entries.size} ${if (game.entries.size == 1) "entry" else "entries"}"
-                },
                 viewModel = viewModel,
                 scrollBehavior = scrollBehavior,
             )
@@ -284,6 +281,14 @@ fun ScoreHistoryScreen(game: Game, viewModel: ScoreViewModel) {
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            Text(
+                text = subtitle,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
             if (game.entries.isEmpty()) {
                 EmptyState(
                     icon = { Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(36.dp)) },
