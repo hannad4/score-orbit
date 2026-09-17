@@ -23,7 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -76,28 +75,19 @@ internal fun ListLeadingBadge(
         modifier = modifier
             .size(48.dp)
             .background(
-                if (showMedal) medal!!
+                if (showMedal) Color(0xFF1A1A1A).copy(alpha = 0.45f)
                 else color.copy(alpha = 0.18f),
                 CircleShape,
             ),
         contentAlignment = Alignment.Center,
     ) {
-        if (showMedal) {
-            if (rank == 1) {
-                Icon(
-                    Icons.Default.EmojiEvents,
-                    contentDescription = null,
-                    tint = Color(0xFF1A1A1A),
-                    modifier = Modifier.size(26.dp),
-                )
-            } else {
-                Text(
-                    "$rank",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1A1A1A),
-                )
-            }
+        if (rank != null) {
+            Text(
+                "$rank",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = medal ?: MaterialTheme.colorScheme.onSurface,
+            )
         } else if (shotNumber != null) {
             Text(
                 "#$shotNumber",
@@ -166,13 +156,14 @@ internal fun ScoreListItem(
     trailingColor: Color,
     leadingBadge: @Composable () -> Unit,
     showTrailing: Boolean = true,
+    contentColor: Color? = null,
 ) {
     ListItem(
         headlineContent = {
             Text(
                 playerName,
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = contentColor ?: MaterialTheme.colorScheme.onSurface,
             )
         },
         supportingContent = supportingText?.let { text ->
@@ -180,7 +171,8 @@ internal fun ScoreListItem(
                 Text(
                     text,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = contentColor?.copy(alpha = 0.75f)
+                        ?: MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },

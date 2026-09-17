@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -49,7 +48,7 @@ import com.scoreorbit.android.viewmodel.ScoreViewModel
 
 /**
  * Player standings ordered highest score to lowest. Ties share a rank;
- * the leader row is highlighted with a trophy.
+ * the top three rows get full gold/silver/bronze backgrounds.
  *
  * M3 Expressive: MediumTopAppBar with game subtitle, extra-large rounded
  * cards, rank badge in an icon container, emphasized title/score type.
@@ -126,16 +125,18 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
                         val (player, score) = standings[index]
                         val rank = ranks[index]
                         val medal = medalFor(rank)
-                        val containerColor = medal?.copy(alpha = 0.18f)
-                            ?: MaterialTheme.colorScheme.surfaceContainer
+                        val onMedal = medal != null
+                        val darkContent = Color(0xFF1A1A1A)
                         ScoreCard(
-                            containerColor = containerColor,
+                            containerColor = medal
+                                ?: MaterialTheme.colorScheme.surfaceContainer,
                         ) {
                             ScoreListItem(
                                 playerName = player.name,
                                 supportingText = null,
                                 trailingText = "$score",
-                                trailingColor = Color(player.color),
+                                trailingColor = if (onMedal) darkContent else Color(player.color),
+                                contentColor = if (onMedal) darkContent else null,
                                 leadingBadge = {
                                     ListLeadingBadge(
                                         rank = rank,
