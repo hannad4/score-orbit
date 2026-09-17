@@ -1,28 +1,20 @@
 # Score Orbit
 
-Scorekeeper for game night. No pens, no paper, no math arguments — everyone gets a colored dot on a ring, and you score by dragging in circles like an old rotary phone. Let go and the dial springs back into place.
-
-Inspired by the Score Anything app on iOS, rebuilt as a native Android app.
+Score keeping app inspired by the Score Anything app on iOS, but for Android.
 
 ![Score Orbit screens](docs/shots/showcase.png)
 
-## How it plays
-
-Set up 1–12 players with names and colors, pick how many points a full spin is worth, then just spin. Tapping a dot scores a smaller quick amount. Tapping a score rotates it so the person across the table can read it.
-
-Changed your mind mid-game? Undo and redo are right there, and every entry lands in a ledger you can scroll back through. When the game ends, the leaderboard ranks everyone — highest or lowest wins, your call.
+## Screens
 
 <p align="center">
   <img src="docs/shots/board.png" width="220" alt="The ring">
   <img src="docs/shots/players.png" width="220" alt="Set up players">
-  <img src="docs/shots/settings.png" width="220" alt="Make it yours">
+  <img src="docs/shots/settings.png" width="220" alt="Settings">
 </p>
 <p align="center">
-  <img src="docs/shots/history.png" width="220" alt="Every point">
-  <img src="docs/shots/leaderboard.png" width="220" alt="Who's winning">
+  <img src="docs/shots/history.png" width="220" alt="Score history">
+  <img src="docs/shots/leaderboard.png" width="220" alt="Leaderboard">
 </p>
-
-Small stuff that matters: follows your system theme (or force light/dark), Material You dynamic color, and haptic feedback with adjustable strength.
 
 ## Build
 
@@ -38,7 +30,7 @@ Release needs the local keystore in `~/.local/share/score-orbit/` (not in the re
 ./gradlew assembleRelease
 ```
 
-Screenshots are generated headless with Paparazzi, then framed into what's in `docs/`:
+Screenshots are generated headless with Paparazzi:
 
 ```bash
 ./gradlew recordPaparazziDebug
