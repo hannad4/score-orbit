@@ -214,6 +214,8 @@ internal fun SharedTopAppBar(
     title: String,
     viewModel: ScoreViewModel,
     scrollBehavior: androidx.compose.material3.TopAppBarScrollBehavior,
+    backDestination: AppScreen = AppScreen.Board,
+    actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
 ) {
     MediumTopAppBar(
         title = {
@@ -224,10 +226,11 @@ internal fun SharedTopAppBar(
             )
         },
         navigationIcon = {
-            IconButton(onClick = { viewModel.go(AppScreen.Board) }) {
+            IconButton(onClick = { viewModel.go(backDestination) }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
         },
+        actions = actions,
         scrollBehavior = scrollBehavior,
     )
 }

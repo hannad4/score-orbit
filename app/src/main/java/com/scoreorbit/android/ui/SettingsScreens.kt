@@ -571,13 +571,11 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text("Player Setup") },
-                navigationIcon = {
-                    IconButton(onClick = { viewModel.go(AppScreen.Settings) }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
+            SharedTopAppBar(
+                title = "Player Setup",
+                viewModel = viewModel,
+                scrollBehavior = scrollBehavior,
+                backDestination = AppScreen.Settings,
                 actions = {
                     // Explicit confirmation path: everything already saves
                     // as you type, so Done just steps back to Settings.
@@ -589,7 +587,6 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                 },
-                scrollBehavior = scrollBehavior,
             )
         },
         floatingActionButton = {
