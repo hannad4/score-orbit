@@ -1,13 +1,25 @@
 package com.scoreorbit.android.ui
 
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -16,34 +28,33 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.scoreorbit.android.model.Game
 import com.scoreorbit.android.model.WinMetric
 import com.scoreorbit.android.viewmodel.AppScreen
 import com.scoreorbit.android.viewmodel.ScoreViewModel
 
-/** Medal tints for the top three ranks; null past third. */
-private fun medalFor(rank: Int): Color? = when (rank) {
-    1 -> Color(0xFFFFD54F)
-    2 -> Color(0xFFC0C0C0)
-    3 -> Color(0xFFCD7F32)
-    else -> null
-}
-
 /**
  * Player standings ordered highest score to lowest. Ties share a rank;
  * the leader row is highlighted with a trophy.
+ *
+ * M3 Expressive: MediumTopAppBar with game subtitle, extra-large rounded
+ * cards, rank badge in an icon container, emphasized title/score type.
+ * Shares layout components with ScoreHistoryScreen for visual consistency.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
     // Rank 1 means "winning": highest score normally, lowest score when
@@ -62,77 +73,69 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
             standings.count { (_, s) -> if (lowestWins) s < score else s > score } + 1
         }
     }
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text("Leaderboard") },
-                navigationIcon = {
-                    IconButton(onClick = { viewModel.go(AppScreen.Board) }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
+            SharedTopAppBar(
+                title = "Leaderboard",
+                subtitle = if (game.name.isNotBlank()) {
+                    "${game.name} • ${if (lowestWins) "Lowest wins" else "Highest wins"}"
+                } else {
+                    if (lowestWins) "Lowest wins" else "Highest wins"
                 },
+                viewModel = viewModel,
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { paddingValues ->
-        if (standings.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "No players yet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            if (standings.isEmpty()) {
+                EmptyState(
+                    icon = { Icon(Icons.Default.Leaderboard, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(36.dp)) },
+                    title = "No standings yet",
+                    subtitle = "Add players to see rankings.",
                 )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(standings.size) { index ->
-                    val (player, score) = standings[index]
-                    val rank = ranks[index]
-                    val medal = medalFor(rank)
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = medal?.copy(alpha = 0.22f)
-                                ?: MaterialTheme.colorScheme.surfaceContainer
-                        ),
-                    ) {
-                        ListItem(
-                            headlineContent = {
-                                Text(
-                                    player.name,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                            },
-                            leadingContent = {
-                                Text(
-                                    "$rank",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = medal ?: MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            },
-                            trailingContent = {
-                                Text(
-                                    "$score",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(player.color),
-                                )
-                            },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(
+                        count = standings.size,
+                        key = { index -> standings[index].first.id },
+                    ) { index ->
+                        val (player, score) = standings[index]
+                        val rank = ranks[index]
+                        val medal = medalFor(rank)
+                        val containerColor = medal?.copy(alpha = 0.18f)
+                            ?: MaterialTheme.colorScheme.surfaceContainer
+                        ScoreCard(
+                            containerColor = containerColor,
+                        ) {
+                            ScoreListItem(
+                                playerName = player.name,
+                                supportingText = if (rank == 1) "Leader • $score pts"
+                                else "${rankLabel(rank)} place • $score pts",
+                                trailingText = "$score",
+                                trailingColor = Color(player.color),
+                                leadingBadge = {
+                                    ListLeadingBadge(
+                                        rank = rank,
+                                        color = Color(player.color),
+                                    )
+                                },
+                            )
+                        }
                     }
                 }
             }
