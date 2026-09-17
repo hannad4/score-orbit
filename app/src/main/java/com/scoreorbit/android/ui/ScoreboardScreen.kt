@@ -94,11 +94,11 @@ private fun seatAngle(index: Int, total: Int): Double {
 }
 
 /**
- * Dial angles with one dot parked on the ray from the dial center toward
- * its own score label, so each dot sits as close as possible to its score
- * on any player count or layout. Labels that bunch up (e.g. stacked rows
- * sharing a column) get their dots spread to the minimum non-overlapping
- * separation, preserving circular order with minimal movement.
+ * Dial angles snapped to an even spread while staying as close as possible
+ * to each score: every dot starts parked on the ray from the dial center
+ * toward its own score label, then the whole set snaps to evenly spaced
+ * slots — trying every rotation and keeping the least total movement — so
+ * crowded labels share the compromise instead of piling dots on each other.
  */
 private fun computeDotAngles(
     labelPositions: Array<Offset?>,
@@ -124,31 +124,39 @@ private fun computeDotAngles(
     if (minSep * n > 2 * PI) {
         return DoubleArray(n) { -PI / 2 + it * 2 * PI / n }
     }
-    // Unwrap candidates in circular order, then one forward push pass and
-    // one backward pull pass. Forward establishes the gaps; backward pulls
-    // everything back toward its candidate without breaking them, so drift
-    // stays minimal. Both passes preserve circular order.
+    // Unwrap candidates in circular order, duplicated with +2PI so every
+    // rotation is a contiguous window.
     val order = (0 until n).sortedBy { cand[it] }
-    val unwrapped = DoubleArray(n)
-    unwrapped[0] = cand[order[0]]
-    for (k in 1 until n) {
-        var target = cand[order[k]]
-        while (target < unwrapped[k - 1]) target += 2 * PI
-        unwrapped[k] = target
+    val ext = DoubleArray(2 * n)
+    for (k in 0 until 2 * n) {
+        var target = cand[order[k % n]]
+        if (k > 0) {
+            while (target < ext[k - 1]) target += 2 * PI
+        }
+        ext[k] = target
     }
-    val placed = DoubleArray(n)
-    placed[0] = unwrapped[0]
-    for (k in 1 until n) {
-        placed[k] = maxOf(unwrapped[k], placed[k - 1] + minSep)
-    }
-    for (k in n - 2 downTo 0) {
-        placed[k] = minOf(placed[k], placed[k + 1] - minSep)
+    // Even slots; try every rotation, keep the least total movement.
+    val step = 2 * PI / n
+    var bestStart = 0
+    var bestBase = 0.0
+    var bestCost = Double.MAX_VALUE
+    for (s in 0 until n) {
+        var base = 0.0
+        for (k in 0 until n) base += ext[s + k] - k * step
+        base /= n
+        var cost = 0.0
+        for (k in 0 until n) cost += abs(ext[s + k] - (base + k * step))
+        if (cost < bestCost) {
+            bestCost = cost
+            bestStart = s
+            bestBase = base
+        }
     }
     val result = DoubleArray(n)
-    for (k in order.indices) {
-        var a = placed[k] % (2 * PI)
+    for (k in 0 until n) {
+        var a = (bestBase + k * step) % (2 * PI)
         if (a < 0) a += 2 * PI
-        result[order[k]] = a
+        result[order[(bestStart + k) % n]] = a
     }
     return result
 }
@@ -616,8 +624,8 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             ) {
                 computeLabelPositions(n, wPx, hPx, cx, cy, ringR, dotD, labelBoxPx, edgeMarginPx, density)
             }
-            // Dial angles, one dot parked on the ray toward its own score
-            // (memoized likewise; de-collided inside).
+            // Dial angles, one dot parked near its own score then snapped
+            // to even spacing (memoized likewise).
             val dotAngles: DoubleArray = remember(labelPositions, cx, cy, ringR, dotD) {
                 computeDotAngles(labelPositions, cx, cy, ringR, dotD)
             }
