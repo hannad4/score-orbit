@@ -1,16 +1,16 @@
 # Score Orbit
 
-Keeping score on paper kills the vibe, so I built this for our game nights. Everyone gets a colored dot on a ring, scores sit out by the edges facing their seat, and you add points by dragging in circles like an old rotary dial. It unwinds with a little spring when you let go.
+Scorekeeper for game night. No pens, no paper, no math arguments — everyone gets a colored dot on a ring, and you score by dragging in circles like an old rotary phone. Let go and the dial springs back into place.
 
-Inspired by the Score Anything app on iOS — I wanted the same feel as an Android-native app.
+Inspired by the Score Anything app on iOS, rebuilt as a native Android app.
 
 ![Score Orbit screens](docs/shots/showcase.png)
 
 ## How it plays
 
-Set up 1–12 players with names and colors, pick how many points a full spin is worth, then just spin. Tapping a dot gives quick points (separate value for that). Tapping a score turns it toward its player so people across the table can read it.
+Set up 1–12 players with names and colors, pick how many points a full spin is worth, then just spin. Tapping a dot scores a smaller quick amount. Tapping a score rotates it so the person across the table can read it.
 
-Undo/redo is there for the usual "wait, that was supposed to go to Sofia" moments, there's a ledger of every entry, and a leaderboard that handles highest- or lowest-wins depending on the game.
+Changed your mind mid-game? Undo and redo are right there, and every entry lands in a ledger you can scroll back through. When the game ends, the leaderboard ranks everyone — highest or lowest wins, your call.
 
 <p align="center">
   <img src="docs/shots/board.png" width="220" alt="The ring">
@@ -22,7 +22,7 @@ Undo/redo is there for the usual "wait, that was supposed to go to Sofia" moment
   <img src="docs/shots/leaderboard.png" width="220" alt="Who's winning">
 </p>
 
-Small stuff that matters: light/dark/system theme with dynamic color, haptic feedback with adjustable strength, Material 3 Expressive throughout.
+Small stuff that matters: follows your system theme (or force light/dark), Material You dynamic color, and haptic feedback with adjustable strength.
 
 ## Build
 
@@ -38,7 +38,7 @@ Release needs the local keystore in `~/.local/share/score-orbit/` (not in the re
 ./gradlew assembleRelease
 ```
 
-Screenshots are generated headless with Paparazzi, then framed by `make_mockups.py` into what's in `docs/`:
+Screenshots are generated headless with Paparazzi, then framed into what's in `docs/`:
 
 ```bash
 ./gradlew recordPaparazziDebug
