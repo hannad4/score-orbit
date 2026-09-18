@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -60,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scoreorbit.android.model.Game
@@ -747,11 +749,24 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 // The live readout only ever shows while points accumulate.
                 val keepLast = game.keepLastVisible
                 val showLive = livePlayer != null && (pending != 0 || (flash == null && keepLast))
+                // Readout anchored on the ring center (cx, cy) — not the box
+                // center, which sits lower now that the layout reserves the
+                // bottom strip for gesture navigation.
+                var readoutSize by remember { mutableStateOf(IntSize.Zero) }
+                val readoutAnchor = Modifier
+                    .align(Alignment.TopStart)
+                    .onSizeChanged { readoutSize = it }
+                    .offset {
+                        IntOffset(
+                            x = (cx - readoutSize.width / 2f).roundToInt(),
+                            y = (cy - readoutSize.height / 2f).roundToInt(),
+                        )
+                    }
                 if (showLive && livePlayer != null) {
                     val c = Color(livePlayer.color)
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.align(Alignment.Center),
+                        modifier = readoutAnchor,
                     ) {
                         Text(
                             text = livePlayer.name,
@@ -775,8 +790,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     val (colorInt, delta, name) = flash
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .align(Alignment.Center)
+                        modifier = readoutAnchor
                             .alpha(flashAlpha)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
