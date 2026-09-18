@@ -31,22 +31,26 @@ data class Game(
     val rotationPoints: Int = 10,
     val tapPoints: Int = 0,
     val winMetric: WinMetric = WinMetric.HIGHEST,
-    val allowNegative: Boolean = false,
     val keepLastVisible: Boolean = false,
     val enlargeActiveDot: Boolean = false,
     val showPlayerNames: Boolean = true,
     val hapticsEnabled: Boolean = false,
     val hapticStrength: Int = 65,
     val entries: List<ScoreEntry> = emptyList(),
-    val createdAt: Long = System.currentTimeMillis(),
-    val finishedAt: Long? = null,
-    val winnerId: String? = null
 ) {
-    fun currentScore(playerId: String): Int =
-        entries.filter { it.playerId == playerId }.fold(0) { acc, e -> acc + e.delta }
+    fun currentScore(playerId: String): Int {
+        var total = 0
+        entries.forEach { if (it.playerId == playerId) total += it.delta }
+        return total
+    }
 
-    fun scoresMap(): Map<String, Int> =
-        players.associate { it.id to currentScore(it.id) }
+    /** Single pass over the ledger instead of one filter+fold per player. */
+    fun scoresMap(): Map<String, Int> {
+        val totals = HashMap<String, Int>(players.size * 2 + 1)
+        players.forEach { totals[it.id] = 0 }
+        entries.forEach { e -> totals[e.playerId] = (totals[e.playerId] ?: 0) + e.delta }
+        return totals
+    }
 
     fun winner(): Player? {
         if (players.isEmpty() || entries.isEmpty()) return null

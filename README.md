@@ -25,6 +25,8 @@ Scores land in a running ledger with undo and redo, so mis-taps are one button p
 ## Details worth knowing
 
 - **Tabletop-first layout.** Scores sit outside the ring facing their seat, and each dial dot parks near its own score. The board adapts from a full grid at 12 players down to a single dial.
+- **Gesture-safe board.** The bottom strip of the board ignores touches, so a swipe up to the home screen never scores by accident.
+- **Never loses your game.** Setup, scores, and undo history save on every change and restore on launch — background the app or come back tomorrow and the board is as you left it.
 - **Adaptive everything.** Follows the system light/dark theme (or override it), picks up Material You dynamic colors on Android 12+, and haptic feedback with adjustable strength.
 - **Built with Material 3 Expressive** components throughout: collapsing app bars, tonal buttons, segmented controls, and spring physics on the dial itself.
 

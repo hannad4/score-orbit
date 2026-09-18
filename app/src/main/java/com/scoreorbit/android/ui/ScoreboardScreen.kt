@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -568,8 +570,14 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             val hPx = with(density) { maxHeight.toPx() }
             if (min(wPx, hPx) <= 0f || game.players.isEmpty()) return@BoxWithConstraints
 
+            // Bottom strip reserved for system gesture navigation: the whole
+            // layout lives above it, and a transparent overlay (below)
+            // swallows every touch inside it, so a swipe-up-home never grabs
+            // the dial or taps a label by accident.
+            val deadZoneFrac = 0.08f
+            val layoutH = hPx * (1f - deadZoneFrac)
             val cx = wPx / 2f
-            val cy = hPx / 2f
+            val cy = layoutH / 2f
             val center = Offset(cx, cy)
             val n = game.players.size
             val minDim = min(wPx, hPx)
@@ -620,9 +628,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             // off their own ring-edge spot when there isn't one). 4+
             // players use the player-order band grid instead.
             val labelPositions: Array<Offset?> = remember(
-                n, wPx, hPx, ringR, dotD, labelBoxPx, edgeMarginPx, density,
+                n, wPx, layoutH, ringR, dotD, labelBoxPx, edgeMarginPx, density,
             ) {
-                computeLabelPositions(n, wPx, hPx, cx, cy, ringR, dotD, labelBoxPx, edgeMarginPx, density)
+                computeLabelPositions(n, wPx, layoutH, cx, cy, ringR, dotD, labelBoxPx, edgeMarginPx, density)
             }
             // Dial angles, one dot parked near its own score then snapped
             // to even spacing (memoized likewise).
@@ -848,6 +856,26 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     )
                 }
             }
+            // Non-interactable strip along the bottom: transparent, but eats
+            // every touch so nothing below the layout — and no
+            // system-gesture swipe passing through — can reach the dial, a
+            // dot, or a label. Taps are swallowed by the no-op click target,
+            // drags by the consuming drag detector (both sit above the board
+            // surface, so nothing below ever sees the gesture).
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .fillMaxHeight(deadZoneFrac)
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, _ -> change.consume() }
+                    }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
+                    )
+            )
         }
     }
 }

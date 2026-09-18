@@ -3,8 +3,6 @@
     <color name="surface">#FF1E1E1E</color>
     <color name="on_background">#FFFFFFFF</color>
     <color name="on_surface">#FFE0E0E0</color>
-    <color name="simple_scoring_blue">#FF3B82F6</color>
-    <color name="simple_scoring_blue_dark">#FF60A5FA</color>
     <color name="score_tile_bg">#FF2A2A2A</color>
     <color name="score_tile_pressed">#FF3A3A3A</color>
     <color name="winner_gold">#FFFFD700</color>
