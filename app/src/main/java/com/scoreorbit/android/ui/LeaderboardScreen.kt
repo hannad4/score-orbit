@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -88,6 +89,24 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
                 title = "Leaderboard",
                 viewModel = viewModel,
                 scrollBehavior = scrollBehavior,
+                actions = {
+                    // Winner toggle, bound to the same winMetric as the
+                    // Settings page — flipping it here updates Settings too,
+                    // and vice versa. Shows the current mode; tap to switch.
+                    FilledTonalButton(
+                        onClick = {
+                            viewModel.setWinMetric(
+                                if (lowestWins) WinMetric.HIGHEST else WinMetric.LOWEST
+                            )
+                        },
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            if (lowestWins) "Lowest" else "Highest",
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                    }
+                },
             )
         },
     ) { paddingValues ->
