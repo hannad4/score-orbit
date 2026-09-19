@@ -185,8 +185,8 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
                         )
                     }
                 }
-                ModeButton("Highest", WinMetric.HIGHEST, selected = !lowestWins)
                 ModeButton("Lowest", WinMetric.LOWEST, selected = lowestWins)
+                ModeButton("Highest", WinMetric.HIGHEST, selected = !lowestWins)
             }
         }
     }
