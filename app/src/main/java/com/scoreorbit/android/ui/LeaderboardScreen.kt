@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Leaderboard
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -89,24 +92,6 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
                 title = "Leaderboard",
                 viewModel = viewModel,
                 scrollBehavior = scrollBehavior,
-                actions = {
-                    // Winner toggle, bound to the same winMetric as the
-                    // Settings page — flipping it here updates Settings too,
-                    // and vice versa. Shows the current mode; tap to switch.
-                    FilledTonalButton(
-                        onClick = {
-                            viewModel.setWinMetric(
-                                if (lowestWins) WinMetric.HIGHEST else WinMetric.LOWEST
-                            )
-                        },
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    ) {
-                        Text(
-                            if (lowestWins) "Lowest" else "Highest",
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                    }
-                },
             )
         },
     ) { paddingValues ->
@@ -166,6 +151,42 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
                         }
                     }
                 }
+            }
+            // Winner mode at bottom, mirroring the History Undo/Redo row:
+            // current mode filled, tap either to switch. Same winMetric as
+            // the Settings page, so both stay in sync either direction.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                @Composable
+                fun ModeButton(label: String, metric: WinMetric, selected: Boolean) {
+                    val buttonModifier = Modifier
+                        .weight(1f)
+                        .height(64.dp)
+                    val content: @Composable RowScope.() -> Unit = {
+                        Text(label, style = MaterialTheme.typography.titleMedium)
+                    }
+                    if (selected) {
+                        Button(
+                            onClick = { viewModel.setWinMetric(metric) },
+                            shape = MaterialTheme.shapes.extraLarge,
+                            modifier = buttonModifier,
+                            content = content,
+                        )
+                    } else {
+                        FilledTonalButton(
+                            onClick = { viewModel.setWinMetric(metric) },
+                            shape = MaterialTheme.shapes.extraLarge,
+                            modifier = buttonModifier,
+                            content = content,
+                        )
+                    }
+                }
+                ModeButton("Highest", WinMetric.HIGHEST, selected = !lowestWins)
+                ModeButton("Lowest", WinMetric.LOWEST, selected = lowestWins)
             }
         }
     }
