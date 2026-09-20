@@ -4,7 +4,17 @@ data class Player(
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String = "Player",
     val color: Int = 0xFF5B9BD5.toInt(),
-    val rotation: Rotation = Rotation.NONE
+    val rotation: Rotation = Rotation.NONE,
+    /** Team this player belongs to, or null for a solo player. */
+    val teamId: String? = null
+) {
+    fun isSolo(): Boolean = teamId == null
+}
+
+data class Team(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val name: String = "Team",
+    val color: Int = 0xFF9C27B0.toInt()
 )
 
 enum class Rotation {
@@ -28,6 +38,7 @@ data class Game(
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String = "Untitled Game",
     val players: List<Player> = emptyList(),
+    val teams: List<Team> = emptyList(),
     val rotationPoints: Int = 10,
     val tapPoints: Int = 0,
     val winMetric: WinMetric = WinMetric.HIGHEST,
@@ -52,18 +63,15 @@ data class Game(
         return totals
     }
 
-    fun winner(): Player? {
-        if (players.isEmpty() || entries.isEmpty()) return null
-        val scores = players.map { p -> p to currentScore(p.id) }
-        return when (winMetric) {
-            WinMetric.HIGHEST -> {
-                val max = scores.maxOf { it.second }
-                scores.firstOrNull { it.second == max }?.first
-            }
-            WinMetric.LOWEST -> {
-                val min = scores.minOf { it.second }
-                scores.firstOrNull { it.second == min }?.first
-            }
-        }
+    /** Teams that actually have players, in zone order. */
+    fun activeTeams(): List<Team> = teams.filter { t -> players.any { it.teamId == t.id } }
+
+    fun teamScore(teamId: String): Int {
+        val ids = players.filter { it.teamId == teamId }.map { it.id }.toSet()
+        var total = 0
+        entries.forEach { if (it.playerId in ids) total += it.delta }
+        return total
     }
+
+    fun teamScoresMap(): Map<String, Int> = activeTeams().associate { it.id to teamScore(it.id) }
 }

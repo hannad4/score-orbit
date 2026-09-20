@@ -6,9 +6,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.text.KeyboardActions
@@ -26,6 +28,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -35,8 +40,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
@@ -48,6 +53,7 @@ import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -61,6 +67,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumTopAppBar
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -76,6 +83,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -86,18 +95,29 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.scoreorbit.android.model.Game
 import com.scoreorbit.android.model.Player
+import com.scoreorbit.android.model.Team
 import com.scoreorbit.android.model.WinMetric
 import com.scoreorbit.android.ui.theme.ScoreOrbitColors
 import com.scoreorbit.android.viewmodel.AppScreen
@@ -105,6 +125,7 @@ import com.scoreorbit.android.viewmodel.ScoreViewModel
 import com.scoreorbit.android.viewmodel.ThemeMode
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -142,6 +163,15 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {
+                    FilledTonalButton(
+                        onClick = { showRestartConfirm = true },
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+                    ) {
+                        Text("New Game", style = MaterialTheme.typography.titleSmall)
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                },
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -155,7 +185,8 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             if (game != null) {
-                SettingsGroup(label = "Game setup") {
+                val teamMode = game.teams.isNotEmpty()
+                SettingsGroup(label = "Game Setup") {
                     // Local text state: pushing every keystroke into the
                     // viewmodel would rebuild this whole screen per character.
                     // Commits on Done, focus loss, or leaving the screen.
@@ -186,31 +217,45 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                                 }
                             },
                     )
+                }
+
+                SettingsGroup(label = "Players") {
+                    // Twin steppers, mirroring the Scoring cells: players on
+                    // the left, teams on the right. Teams default to 0,
+                    // players to 2.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                    ) {
+                        StepperCell(
+                            value = "${game.players.size}",
+                            caption = "Number of Players",
+                            onMinus = { viewModel.setPlayerCount(game.players.size - 1) },
+                            onPlus = { viewModel.setPlayerCount(game.players.size + 1) },
+                            minusEnabled = game.players.size > 1,
+                            plusEnabled = game.players.size < 12,
+                            modifier = Modifier.weight(1f),
+                        )
+                        StepperCell(
+                            value = "${game.teams.size}",
+                            caption = "Number of Teams",
+                            onMinus = { viewModel.setTeamCount(game.teams.size - 1) },
+                            onPlus = { viewModel.setTeamCount(game.teams.size + 1) },
+                            minusEnabled = game.teams.size > 0,
+                            plusEnabled = game.teams.size < 4,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
-                        headlineContent = { Text("Number of Players") },
-                        leadingContent = {
-                            Icon(
-                                Icons.Default.Group,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        headlineContent = { Text("Roster Setup") },
+                        supportingContent = {
+                            Text(
+                                if (teamMode) "${game.players.size} players \u2022 ${game.teams.size} teams"
+                                else "${game.players.size} players"
                             )
                         },
-                        trailingContent = {
-                            StepperControl(
-                                value = "${game.players.size}",
-                                onMinus = { viewModel.setPlayerCount(game.players.size - 1) },
-                                onPlus = { viewModel.setPlayerCount(game.players.size + 1) },
-                                minusEnabled = game.players.size > 1,
-                                plusEnabled = game.players.size < 12,
-                            )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    ListItem(
-                        headlineContent = { Text("Player Setup") },
-                        supportingContent = { Text("${game.players.size} players") },
                         leadingContent = {
                             Icon(
                                 Icons.Default.ManageAccounts,
@@ -228,15 +273,6 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         modifier = Modifier.clickable { viewModel.go(AppScreen.PlayerSetup) },
                     )
-                }
-
-                Button(
-                    onClick = { showRestartConfirm = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                ) {
-                    Text("Start a New Game", style = MaterialTheme.typography.titleMedium)
                 }
 
                 SettingsGroup(label = "Scoring") {
@@ -489,31 +525,6 @@ private fun SettingsGroup(label: String, content: @Composable () -> Unit) {
     }
 }
 
-@Composable
-private fun StepperControl(
-    value: String,
-    onMinus: () -> Unit,
-    onPlus: () -> Unit,
-    minusEnabled: Boolean = true,
-    plusEnabled: Boolean = true,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        FilledTonalIconButton(onClick = onMinus, enabled = minusEnabled, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Default.Remove, contentDescription = "Decrease")
-        }
-        Text(
-            value,
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.width(48.dp),
-        )
-        FilledTonalIconButton(onClick = onPlus, enabled = plusEnabled, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Default.Add, contentDescription = "Increase")
-        }
-    }
-}
-
 /** Compact value-forward stepper: big number, steppers, one-line caption. */
 @Composable
 private fun StepperCell(
@@ -561,18 +572,35 @@ private fun StepperCell(
 // Player setup
 // ---------------------------------------------------------------------------
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
+    val ctx = LocalContext.current
+    var latestGame by remember { mutableStateOf(game) }
+    latestGame = game
     var paletteFor by remember { mutableStateOf<Player?>(null) }
+    var teamPaletteFor by remember { mutableStateOf<Team?>(null) }
+    var assignFor by remember { mutableStateOf<Player?>(null) }
+    var showNewTeam by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    // Long-press-drag reorder state. The dragged card follows the finger via
+    // graphicsLayer (placement untouched); neighbors swap live underneath.
+    var draggedId by remember(game.id) { mutableStateOf<String?>(null) }
+    var dragOffsetY by remember(game.id) { mutableFloatStateOf(0f) }
+    var cardHeightPx by remember(game.id) { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val stepPx = cardHeightPx + with(density) { 10.dp.toPx() }
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    // Team mode shows the Teams section and per-player team chips;
+    // Individual mode is a pure player list.
+    val teamMode = game.teams.isNotEmpty()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             SharedTopAppBar(
-                title = "Player Setup",
+                title = "Roster Setup",
                 viewModel = viewModel,
                 scrollBehavior = scrollBehavior,
                 backDestination = AppScreen.Settings,
@@ -599,144 +627,230 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
             }
         },
     ) { paddingValues ->
-        Column(
+        LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                "Changes apply instantly",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            item {
+                Text(
+                    "Changes apply instantly",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    if (teamMode) "Drag the handle to reorder \u2022 tap Solo to join a team"
+                    else "Drag the handle to reorder",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             // Mini ring preview.
-            RingPreview(players = game.players, modifier = Modifier.align(Alignment.CenterHorizontally))
-
-            game.players.forEachIndexed { index, player ->
-                val defaultName = "Player ${index + 1}"
+            item {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    RingPreview(players = game.players)
+                }
+            }
+            // Teams live above the roster: color, name, members, delete.
+            // Hidden entirely in Individual mode.
+            if (teamMode) {
+                item {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            "Teams",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (game.teams.size < 4) {
+                            TextButton(onClick = { showNewTeam = true }) {
+                                Text("New team")
+                            }
+                        }
+                    }
+                }
+                items(game.teams, key = { it.id }) { team ->
+                    val members = game.players.filter { p -> p.teamId == team.id }
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer
+                        ),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            ColorDot(color = team.color, onPick = { teamPaletteFor = team })
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                RosterNameField(
+                                    key = team.id,
+                                    initial = team.name,
+                                    defaultName = "",
+                                    color = Color(team.color),
+                                    onRename = { viewModel.renameTeam(team.id, it) },
+                                )
+                                Text(
+                                    if (members.isEmpty()) "No players yet"
+                                    else members.joinToString { it.name },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            IconButton(
+                                onClick = { viewModel.deleteTeam(team.id) },
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Delete team",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            items(game.players, key = { it.id }) { player ->
+                val team = game.teams.firstOrNull { t -> t.id == player.teamId }
+                val isDragged = draggedId == player.id
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    ),
+                    modifier = Modifier
+                        .onSizeChanged { if (cardHeightPx == 0) cardHeightPx = it.height }
+                        .zIndex(if (isDragged) 1f else 0f)
+                        .graphicsLayer {
+                            if (isDragged) {
+                                translationY = dragOffsetY
+                                scaleX = 1.03f
+                                scaleY = 1.03f
+                                shadowElevation = 24f
+                            }
+                        }
+                        .animateItemPlacement(),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box(
+                        Icon(
+                            Icons.Default.DragHandle,
+                            contentDescription = "Drag to reorder",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
-                                .size(40.dp)
-                                .clickable { paletteFor = player },
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(player.color))
-                                    .border(2.dp, Color.White.copy(alpha = 0.4f), CircleShape),
-                            )
-                            Icon(
-                                Icons.Default.Palette,
-                                contentDescription = "Change color",
-                                tint = Color.White.copy(alpha = 0.8f),
-                                modifier = Modifier
-                                    .size(21.dp)
-                                    .align(Alignment.BottomEnd)
-                                    .offset(x = 5.dp, y = 5.dp),
-                            )
-                        }
+                                .size(24.dp)
+                                .pointerInput(player.id) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = {
+                                            draggedId = player.id
+                                            dragOffsetY = 0f
+                                            if (latestGame.hapticsEnabled) {
+                                                buzz(ctx, 25, latestGame.hapticStrength)
+                                            }
+                                        },
+                                        onDrag = { change, amount ->
+                                            change.consume()
+                                            dragOffsetY += amount.y
+                                            if (stepPx > 0f) {
+                                                val shift = (dragOffsetY / stepPx).roundToInt()
+                                                if (shift != 0) {
+                                                    val g = latestGame
+                                                    val idx = g.players.indexOfFirst { p -> p.id == player.id }
+                                                    if (idx >= 0) {
+                                                        viewModel.movePlayer(player.id, idx + shift)
+                                                        dragOffsetY -= shift * stepPx
+                                                        if (latestGame.hapticsEnabled) {
+                                                            buzz(ctx, 12, latestGame.hapticStrength)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            draggedId = null
+                                            dragOffsetY = 0f
+                                        },
+                                        onDragCancel = {
+                                            draggedId = null
+                                            dragOffsetY = 0f
+                                        },
+                                    )
+                                },
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
-                        // Hint-style editing: untouched defaults live as an empty
-                        // box with the default as the hint, so there is never
-                        // any text to fight over — tapping just types. Custom
-                        // names still get select-all on tap (re-applied after
-                        // the tap lands, since the tap re-places the cursor
-                        // after focus and would clobber an immediate selection).
-                        // Blank always saves back to the default, so model,
-                        // box and hint can never disagree.
-                    var nameField by remember(player.id) {
-                        mutableStateOf(TextFieldValue(player.name))
-                    }
-                        val focusManager = LocalFocusManager.current
-                        val scope = rememberCoroutineScope()
-                        var selectJob by remember(player.id) { mutableStateOf<Job?>(null) }
-                        fun selectAll() {
-                            if (nameField.text.isNotEmpty()) {
-                                nameField = nameField.copy(
-                                    selection = TextRange(0, nameField.text.length)
-                                )
-                            }
+                        ColorDot(color = player.color, onPick = { paletteFor = player })
+                        Spacer(modifier = Modifier.width(4.dp))
+                        RosterNameField(
+                            key = player.id,
+                            initial = player.name,
+                            defaultName = "Player ${game.players.indexOfFirst { p -> p.id == player.id } + 1}",
+                            color = Color(player.color),
+                            onRename = { viewModel.renamePlayer(player.id, it) },
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (teamMode) {
+                            AssistChip(
+                                onClick = { assignFor = player },
+                                label = { Text(team?.name ?: "Solo") },
+                                leadingIcon = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                Color(
+                                                    team?.color
+                                                        ?: ScoreOrbitColors.PlayerColors[0]
+                                                )
+                                            ),
+                                    )
+                                },
+                            )
                         }
-                        OutlinedTextField(
-                            value = nameField,
-                            onValueChange = {
-                                nameField = it
-                                viewModel.renamePlayer(player.id, it.text.ifBlank { defaultName })
-                            },
-                            singleLine = true,
-                            label = { Text(defaultName) },
-                            trailingIcon = {
+                        if (game.players.size > 1) {
+                            IconButton(
+                                onClick = { viewModel.removePlayer(player.id) },
+                                modifier = Modifier.size(32.dp),
+                            ) {
                                 Icon(
-                                    Icons.Default.Edit,
-                                    contentDescription = null,
+                                    Icons.Default.Close,
+                                    contentDescription = "Remove player",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                            },
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(
-                                onDone = { focusManager.clearFocus() }
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .onFocusChanged { focus ->
-                                    if (focus.isFocused) {
-                                        if (nameField.text.isNotEmpty()) {
-                                            // Select now AND re-select once the
-                                            // tap has landed (see above).
-                                            selectAll()
-                                            selectJob?.cancel()
-                                            selectJob = scope.launch {
-                                                delay(150)
-                                                selectAll()
-                                            }
-                                        }
-                                    } else {
-                                        selectJob?.cancel()
-                                        if (nameField.text.isBlank()) {
-                                            nameField = TextFieldValue(defaultName)
-                                        }
-                                    }
-                                },
-                            colors = TextFieldDefaults.colors(
-                                focusedTextColor = Color(player.color),
-                                unfocusedTextColor = Color(player.color),
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                unfocusedIndicatorColor = Color.Transparent,
-                            ),
-                        )
-                        if (game.players.size > 1) {
-                            IconButton(onClick = { viewModel.removePlayer(player.id) }, modifier = Modifier.size(32.dp)) {
-                                Icon(Icons.Default.Close, contentDescription = "Remove player", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
                 }
             }
 
-            if (game.players.size >= 12) {
-                Text(
-                    "Maximum 12 players",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            item {
+                if (game.players.size >= 12) {
+                    Text(
+                        "Maximum 12 players",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                Spacer(modifier = Modifier.height(88.dp))
             }
-            Spacer(modifier = Modifier.height(88.dp))
         }
     }
 
@@ -750,6 +864,271 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
             onDismiss = { paletteFor = null },
         )
     }
+    teamPaletteFor?.let { team ->
+        ColorPaletteDialog(
+            selected = team.color,
+            onPick = {
+                viewModel.recolorTeam(team.id, it)
+                teamPaletteFor = null
+            },
+            onDismiss = { teamPaletteFor = null },
+        )
+    }
+    assignFor?.let { player ->
+        AssignTeamDialog(
+            playerName = player.name,
+            currentTeamId = player.teamId,
+            teams = game.teams,
+            onConfirm = { pick, newName ->
+                if (pick == NEW_TEAM_ID) {
+                    val id = viewModel.createTeam(newName)
+                    if (id != null) viewModel.assignPlayer(player.id, id)
+                } else {
+                    viewModel.assignPlayer(player.id, pick)
+                }
+                assignFor = null
+            },
+            onDismiss = { assignFor = null },
+        )
+    }
+    if (showNewTeam) {
+        NewTeamDialog(
+            onConfirm = {
+                viewModel.createTeam(it)
+                showNewTeam = false
+            },
+            onDismiss = { showNewTeam = false },
+        )
+    }
+}
+
+/** Tint shown for solos in the team chip when they belong to no team. */
+private const val NEW_TEAM_ID = "__new__"
+
+/** Color dot that opens the palette dialog. Shared by player and team rows. */
+@Composable
+private fun ColorDot(color: Int, onPick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clickable(onClick = onPick),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color(color))
+                .border(2.dp, Color.White.copy(alpha = 0.4f), CircleShape),
+        )
+        Icon(
+            Icons.Default.Palette,
+            contentDescription = "Change color",
+            tint = Color.White.copy(alpha = 0.8f),
+            modifier = Modifier
+                .size(21.dp)
+                .align(Alignment.BottomEnd)
+                .offset(x = 5.dp, y = 5.dp),
+        )
+    }
+}
+
+/**
+ * Hint-style name box: untouched defaults live as an empty box with the
+ * default as the hint, so there is never any text to fight over — tapping
+ * just types. Custom names still get select-all on tap (re-applied after
+ * the tap lands, since the tap re-places the cursor after focus and would
+ * clobber an immediate selection). Blank always saves back to the default,
+ * so model, box and hint can never disagree. The keyboard treats it as a
+ * person's name, so autocapitalization kicks in.
+ */
+@Composable
+private fun RosterNameField(
+    key: String,
+    initial: String,
+    defaultName: String,
+    color: Color,
+    onRename: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var nameField by remember(key) { mutableStateOf(TextFieldValue(initial)) }
+    val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
+    var selectJob by remember(key) { mutableStateOf<Job?>(null) }
+    fun selectAll() {
+        if (nameField.text.isNotEmpty()) {
+            nameField = nameField.copy(selection = TextRange(0, nameField.text.length))
+        }
+    }
+    OutlinedTextField(
+        value = nameField,
+        onValueChange = {
+            nameField = it
+            onRename(it.text.ifBlank { defaultName })
+        },
+        singleLine = true,
+        label = { Text(defaultName) },
+        keyboardOptions = KeyboardOptions(
+            capitalization = KeyboardCapitalization.Words,
+            keyboardType = KeyboardType.Text,
+            imeAction = ImeAction.Done,
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { focusManager.clearFocus() }
+        ),
+        modifier = modifier
+            .onFocusChanged { focus ->
+                if (focus.isFocused) {
+                    if (nameField.text.isNotEmpty()) {
+                        // Select now AND re-select once the
+                        // tap has landed (see above).
+                        selectAll()
+                        selectJob?.cancel()
+                        selectJob = scope.launch {
+                            delay(150)
+                            selectAll()
+                        }
+                    }
+                } else {
+                    selectJob?.cancel()
+                    if (nameField.text.isBlank()) {
+                        nameField = TextFieldValue(defaultName)
+                    }
+                }
+            },
+        colors = TextFieldDefaults.colors(
+            focusedTextColor = color,
+            unfocusedTextColor = color,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            unfocusedIndicatorColor = Color.Transparent,
+        ),
+    )
+}
+
+/** Pick Solo, an existing team, or name a new one. */
+@Composable
+private fun AssignTeamDialog(
+    playerName: String,
+    currentTeamId: String?,
+    teams: List<Team>,
+    onConfirm: (pick: String?, newName: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var pick by remember(playerName) { mutableStateOf<String?>(currentTeamId) }
+    var newName by remember(playerName) { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(playerName) },
+        text = {
+            Column {
+                TeamPickRow(selected = pick == null, onPick = { pick = null }, label = "Solo") {
+                    Text("Solo")
+                }
+                teams.forEach { team ->
+                    TeamPickRow(
+                        selected = pick == team.id,
+                        onPick = { pick = team.id },
+                        label = team.name,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(team.color)),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(team.name)
+                        }
+                    }
+                }
+                TeamPickRow(
+                    selected = pick == NEW_TEAM_ID,
+                    onPick = { pick = NEW_TEAM_ID },
+                    label = "New team",
+                ) {
+                    Text("New team")
+                }
+                if (pick == NEW_TEAM_ID) {
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        singleLine = true,
+                        label = { Text("Team name") },
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            keyboardType = KeyboardType.Text,
+                            imeAction = ImeAction.Done,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(pick, newName) }) { Text("Done") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+@Composable
+private fun TeamPickRow(
+    selected: Boolean,
+    onPick: () -> Unit,
+    label: String,
+    content: @Composable () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                onClick = onPick,
+                role = Role.RadioButton,
+            )
+            .padding(vertical = 8.dp),
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(modifier = Modifier.semantics { contentDescription = label }) {
+            content()
+        }
+    }
+}
+
+/** Name-only dialog behind the Teams "New team" button. */
+@Composable
+private fun NewTeamDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New team") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                singleLine = true,
+                label = { Text("Team name") },
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Words,
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Done,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(name) }) { Text("Create") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
 
 /** Small ring with the players' dots, previewing the tabletop board. */

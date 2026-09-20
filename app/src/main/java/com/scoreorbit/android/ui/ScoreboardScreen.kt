@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Leaderboard
@@ -66,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scoreorbit.android.model.Game
 import com.scoreorbit.android.model.Player
+import com.scoreorbit.android.model.Team
 import com.scoreorbit.android.util.RotationUtils
 import com.scoreorbit.android.viewmodel.AppScreen
 import com.scoreorbit.android.viewmodel.ScoreViewModel
@@ -79,6 +81,7 @@ import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -208,6 +211,109 @@ private fun rayToEdge(center: Offset, dir: Offset, w: Float, h: Float, margin: F
     if (dir.y > 1e-6f) t = min(t, (h - margin - center.y) / dir.y)
     else if (dir.y < -1e-6f) t = min(t, (margin - center.y) / dir.y)
     return if (t.isFinite()) t.coerceAtLeast(0f) else 0f
+}
+
+/**
+ * One board zone in team mode: a quadrant owned by a team (tinted, with a
+ * total chip in its outer corner) or the solo zone (untinted, no chip).
+ * Member positions are zone-local; add the zone origin for board coords.
+ */
+private data class ZoneRect(val l: Float, val t: Float, val r: Float, val b: Float)
+
+private data class ZoneMember(val playerIndex: Int, val local: Offset, val boxPx: Float)
+
+private data class Zone(
+    val rect: ZoneRect,
+    val team: Team?,
+    val corner: Alignment,
+    val members: List<ZoneMember>,
+)
+
+/**
+ * Quadrant layout for team games. Non-empty teams take the quadrants in
+ * order (top-left, top-right, bottom-left, bottom-right), solos share one
+ * trailing zone. Members form a centered grid fitted to their zone; more
+ * than four groups share the last zone instead of breaking the layout.
+ * Pure geometry — scoring state stays per player, untouched.
+ */
+private fun computeZones(
+    players: List<Player>,
+    teams: List<Team>,
+    wPx: Float,
+    hPx: Float,
+    labelBoxPx: Float,
+    density: Density,
+): List<Zone> {
+    val teamGroups = teams.filter { t -> players.any { it.teamId == t.id } }
+    val soloIdx = players.mapIndexedNotNull { i, p -> if (p.teamId == null) i else null }
+    val groups = ArrayDeque<Pair<Team?, List<Int>>>()
+    teamGroups.forEach { t ->
+        groups.add(t to players.mapIndexedNotNull { i, p -> if (p.teamId == t.id) i else null })
+    }
+    if (soloIdx.isNotEmpty()) groups.add(null to soloIdx)
+    while (groups.size > 4) {
+        val overflow = groups.removeLast()
+        val last = groups.removeLast()
+        // Overflow shares the last zone: members appended, grid refit.
+        groups.add(last.first to (last.second + overflow.second))
+    }
+    val corners = listOf(Alignment.TopStart, Alignment.TopEnd, Alignment.BottomStart, Alignment.BottomEnd)
+    val gapPx = with(density) { 12.dp.toPx() }
+    val insetPx = with(density) { 4.dp.toPx() }
+    return groups.mapIndexed { zi, (team, memberIdx) ->
+        val rect = when (zi) {
+                0 -> ZoneRect(insetPx, insetPx, wPx / 2f - insetPx, hPx / 2f - insetPx)
+                1 -> ZoneRect(wPx / 2f + insetPx, insetPx, wPx - insetPx, hPx / 2f - insetPx)
+                2 -> ZoneRect(insetPx, hPx / 2f + insetPx, wPx / 2f - insetPx, hPx - insetPx)
+                else -> ZoneRect(wPx / 2f + insetPx, hPx / 2f + insetPx, wPx - insetPx, hPx - insetPx)
+            }
+            val m = memberIdx.size
+            val cols = when {
+                m <= 1 -> 1
+                m == 2 -> 2
+                m <= 4 -> 2
+                else -> 3
+            }
+            val rows = (m + cols - 1) / cols
+            val pitch = labelBoxPx + gapPx
+            val zoneW = rect.r - rect.l
+            val zoneH = rect.b - rect.t
+            val fit = min(
+                1f,
+                min(
+                    (zoneW - gapPx) / (cols * pitch),
+                    (zoneH - gapPx) / (rows * pitch),
+                ),
+            ).coerceAtLeast(0.4f)
+            val box = labelBoxPx * fit
+            val step = pitch * fit
+            // Grid center pushed outward from the dial so member labels
+            // clear the ring, then clamped so the fitted grid stays inside
+            // its zone.
+            val rawCx = (rect.l + rect.r) / 2f
+            val rawCy = (rect.t + rect.b) / 2f
+            val dx = rawCx - wPx / 2f
+            val dy = rawCy - hPx / 2f
+            val len = sqrt(dx * dx + dy * dy)
+            val push = min(zoneW, zoneH) * 0.18f
+            val wantCx = if (len > 0f) rawCx + dx / len * push else rawCx
+            val wantCy = if (len > 0f) rawCy + dy / len * push else rawCy
+            val hw = ((cols - 1) * step + box) / 2f
+            val hh = ((rows - 1) * step + box) / 2f
+            val gcX = if (hw * 2f >= zoneW) rawCx else wantCx.coerceIn(rect.l + hw, rect.r - hw)
+            val gcY = if (hh * 2f >= zoneH) rawCy else wantCy.coerceIn(rect.t + hh, rect.b - hh)
+            val cx = gcX - rect.l
+            val cy = gcY - rect.t
+            val members = memberIdx.mapIndexed { k, pi ->
+                val gy = k / cols
+                val rowLen = min(cols, m - gy * cols)
+                val gx = k % cols
+                val x = cx + (gx - (rowLen - 1) / 2f) * step
+                val y = cy + (gy - (rows - 1) / 2f) * step
+                ZoneMember(pi, Offset(x, y), box)
+            }
+            Zone(rect, team, corners[zi], members)
+        }
 }
 
 /**
@@ -623,16 +729,55 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             }
             val scoreSp = (labelBoxPx * 0.44f / density.density).coerceIn(20f, 64f)
 
+            // Team mode: quadrants own the labels and each team gets a total
+            // chip. Solo-only games keep the legacy edge layout exactly.
+            val zoned = game.players.any { it.teamId != null }
+            val zones: List<Zone> = if (zoned) {
+                remember(game.players, game.teams, wPx, layoutH, labelBoxPx, density) {
+                    computeZones(game.players, game.teams, wPx, layoutH, labelBoxPx, density)
+                }
+            } else emptyList()
             // Scores pushed out to the screen edges (memoized: pure layout
             // math, independent of gesture state). 1-3 players use the
             // seatAngle-driven layout (anchors at their natural rotary
             // start point; side players stack off a same-half anchor, or
             // off their own ring-edge spot when there isn't one). 4+
-            // players use the player-order band grid instead.
-            val labelPositions: Array<Offset?> = remember(
-                n, wPx, layoutH, ringR, dotD, labelBoxPx, edgeMarginPx, density,
-            ) {
-                computeLabelPositions(n, wPx, layoutH, cx, cy, ringR, dotD, labelBoxPx, edgeMarginPx, density)
+            // players use the player-order band grid instead. Team games
+            // read positions back out of the zone grids.
+            val labelPositions: Array<Offset?> = if (zoned) {
+                remember(zones) {
+                    arrayOfNulls<Offset>(n).also { arr ->
+                        zones.forEach { z ->
+                            z.members.forEach { m ->
+                                arr[m.playerIndex] = Offset(z.rect.l + m.local.x, z.rect.t + m.local.y)
+                            }
+                        }
+                    }
+                }
+            } else {
+                remember(
+                    n, wPx, layoutH, ringR, dotD, labelBoxPx, edgeMarginPx, density,
+                ) {
+                    computeLabelPositions(n, wPx, layoutH, cx, cy, ringR, dotD, labelBoxPx, edgeMarginPx, density)
+                }
+            }
+            // Per-player label box: uniform in legacy mode, fitted per zone
+            // member in team mode.
+            val memberBoxPx = if (zoned) {
+                remember(zones) {
+                    FloatArray(n) { labelBoxPx }.also { arr ->
+                        zones.forEach { z ->
+                            z.members.forEach { m -> arr[m.playerIndex] = m.boxPx }
+                        }
+                    }
+                }
+            } else {
+                remember(labelBoxPx, n) { FloatArray(n) { labelBoxPx } }
+            }
+            fun memberScoreSp(boxPx: Float): Float =
+                (boxPx * 0.44f / density.density).coerceIn(14f, 64f)
+            val teamTotals = remember(game.entries, game.players, game.teams) {
+                game.teamScoresMap()
             }
             // Dial angles, one dot parked near its own score then snapped
             // to even spacing (memoized likewise).
@@ -843,31 +988,86 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 }
 
                 // Render all labels (positions already clamped on-screen by
-                // computeLabelPositions).
-                game.players.forEachIndexed { i, player ->
-                    val pos = labelPositions[i]!!
-                    val isActive = activeId == player.id
-                    SeatScore(
-                        player = player,
-                        // The edge score always shows the player's committed
-                        // total; the live spin delta lives only in the center
-                        // readout while swiping, then commits on release.
-                        score = totals[player.id] ?: 0,
-                        showName = game.showPlayerNames,
-                        scoreSp = scoreSp,
-                        boxDp = dp(labelBoxPx),
-                        dimmed = activeId != null && !isActive,
-                        offsetPx = IntOffset(
-                            x = (pos.x - labelBoxPx / 2f).toInt(),
-                            y = (pos.y - labelBoxPx / 2f).toInt(),
-                        ),
-                        onTap = {
-                            if (game.hapticsEnabled) {
-                                buzz(ctx, 20, game.hapticStrength)
+                // computeLabelPositions, or fitted to their zone in team
+                // mode).
+                if (!zoned) {
+                    game.players.forEachIndexed { i, player ->
+                        val pos = labelPositions[i]!!
+                        val isActive = activeId == player.id
+                        SeatScore(
+                            player = player,
+                            // The edge score always shows the player's committed
+                            // total; the live spin delta lives only in the center
+                            // readout while swiping, then commits on release.
+                            score = totals[player.id] ?: 0,
+                            showName = game.showPlayerNames,
+                            scoreSp = memberScoreSp(memberBoxPx[i]),
+                            boxDp = dp(memberBoxPx[i]),
+                            dimmed = activeId != null && !isActive,
+                            offsetPx = IntOffset(
+                                x = (pos.x - memberBoxPx[i] / 2f).toInt(),
+                                y = (pos.y - memberBoxPx[i] / 2f).toInt(),
+                            ),
+                            onTap = {
+                                if (game.hapticsEnabled) {
+                                    buzz(ctx, 20, game.hapticStrength)
+                                }
+                                viewModel.rotatePlayer(player.id)
+                            },
+                        )
+                    }
+                } else {
+                    // Team zones: tinted quadrant, total chip in the outer
+                    // corner, member labels in a fitted grid. Chips are
+                    // display only, so dial gestures pass straight through.
+                    zones.forEach { zone ->
+                        Box(
+                            modifier = Modifier
+                                .offset { IntOffset(zone.rect.l.toInt(), zone.rect.t.toInt()) }
+                                .size(
+                                    with(density) { (zone.rect.r - zone.rect.l).toDp() },
+                                    with(density) { (zone.rect.b - zone.rect.t).toDp() },
+                                )
+                        ) {
+                            val team = zone.team
+                            if (team != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(24.dp))
+                                        .background(Color(team.color).copy(alpha = 0.08f)),
+                                )
+                                TeamTotalChip(
+                                    team = team,
+                                    total = teamTotals[team.id] ?: 0,
+                                    modifier = Modifier
+                                        .align(zone.corner)
+                                        .padding(12.dp),
+                                )
                             }
-                            viewModel.rotatePlayer(player.id)
-                        },
-                    )
+                            zone.members.forEach { m ->
+                                val player = game.players[m.playerIndex]
+                                SeatScore(
+                                    player = player,
+                                    score = totals[player.id] ?: 0,
+                                    showName = game.showPlayerNames,
+                                    scoreSp = memberScoreSp(m.boxPx),
+                                    boxDp = dp(m.boxPx),
+                                    dimmed = activeId != null && activeId != player.id,
+                                    offsetPx = IntOffset(
+                                        x = (m.local.x - m.boxPx / 2f).toInt(),
+                                        y = (m.local.y - m.boxPx / 2f).toInt(),
+                                    ),
+                                    onTap = {
+                                        if (game.hapticsEnabled) {
+                                            buzz(ctx, 20, game.hapticStrength)
+                                        }
+                                        viewModel.rotatePlayer(player.id)
+                                    },
+                                )
+                            }
+                        }
+                    }
                 }
             }
             // Non-interactable strip along the bottom: transparent, but eats
@@ -1026,8 +1226,33 @@ private fun trailFadeColors(color: Color, tipDeg: Float, clockwise: Boolean): Li
     }
 }
 
-/** One player dot on the ring. Split out so untouched dots skip recomposition. */
+/** Team name + collective total. Display only — never consumes touches. */
 @Composable
+private fun TeamTotalChip(team: Team, total: Int, modifier: Modifier = Modifier) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text = team.name,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = "$total",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color(team.color),
+        )
+    }
+}
+
+/** One player dot on the ring. Split out so untouched dots skip recomposition. */@Composable
 private fun SeatDot(
     color: Color,
     sizeDp: Dp,

@@ -54,6 +54,10 @@ import com.scoreorbit.android.viewmodel.ScoreViewModel
  * Player standings ordered highest score to lowest. Ties share a rank;
  * the top three rows get full gold/silver/bronze backgrounds.
  *
+ * Team games split into two ranked sections — Teams (collective totals,
+ * members listed underneath) and Players (solos) — while solo-only games
+ * keep the single plain list.
+ *
  * M3 Expressive: MediumTopAppBar with game subtitle, extra-large rounded
  * cards, rank badge in an icon container, emphasized title/score type.
  * Shares layout components with ScoreHistoryScreen for visual consistency.
@@ -64,24 +68,70 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
     // Rank 1 means "winning": highest score normally, lowest score when
     // the board plays lowest-wins. Ties share a rank.
     val lowestWins = game.winMetric == WinMetric.LOWEST
-    val standings = remember(game) {
-        game.players
-            .map { player -> player to game.currentScore(player.id) }
-            .sortedWith(
-                if (lowestWins) compareBy { (_, score) -> score }
-                else compareByDescending { (_, score) -> score }
-            )
+    fun ordered(scores: List<Pair<Int, Int>>): List<Pair<Int, Int>> =
+        scores.sortedWith(
+            if (lowestWins) compareBy { (_, s) -> s }
+            else compareByDescending { (_, s) -> s }
+        )
+    fun rankOf(orderedScores: List<Int>, score: Int): Int =
+        orderedScores.count { s -> if (lowestWins) s < score else s > score } + 1
+    val totals = remember(game.entries, game.players) { game.scoresMap() }
+    val teamTotals = remember(game.entries, game.players, game.teams) { game.teamScoresMap() }
+    // Section indexes into the roster: team sections hold team indexes,
+    // the solo section holds player indexes.
+    val teamOrder = remember(game.teams, lowestWins, teamTotals) {
+        ordered(game.teams.mapIndexed { i, t -> i to (teamTotals[t.id] ?: 0) })
     }
-    val ranks = remember(standings, lowestWins) {
-        standings.map { (_, score) ->
-            standings.count { (_, s) -> if (lowestWins) s < score else s > score } + 1
-        }
+    val soloOrder = remember(game.players, lowestWins, totals) {
+        ordered(game.players.mapIndexedNotNull { i, p -> if (p.teamId == null) i to (totals[p.id] ?: 0) else null })
     }
+    val hasTeams = teamOrder.isNotEmpty()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val subtitle = if (game.name.isNotBlank()) {
         "${game.name} • ${if (lowestWins) "Lowest wins" else "Highest wins"}"
     } else {
         if (lowestWins) "Lowest wins" else "Highest wins"
+    }
+
+    @Composable
+    fun StandingRow(
+        name: String,
+        supporting: String?,
+        score: Int,
+        color: Color,
+        rank: Int,
+    ) {
+        val medal = medalFor(rank)
+        val onMedal = medal != null
+        val darkContent = Color(0xFF1A1A1A)
+        ScoreCard(
+            containerColor = medal
+                ?: MaterialTheme.colorScheme.surfaceContainer,
+        ) {
+            ScoreListItem(
+                playerName = name,
+                supportingText = supporting,
+                trailingText = "$score",
+                trailingColor = if (onMedal) darkContent else color,
+                contentColor = if (onMedal) darkContent else null,
+                leadingBadge = {
+                    ListLeadingBadge(
+                        rank = rank,
+                        color = color,
+                    )
+                },
+            )
+        }
+    }
+
+    @Composable
+    fun SectionLabel(text: String) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
     }
 
     Scaffold(
@@ -108,7 +158,7 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
-            if (standings.isEmpty()) {
+            if (game.players.isEmpty()) {
                 EmptyState(
                     icon = { Icon(Icons.Default.Leaderboard, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(36.dp)) },
                     title = "No standings yet",
@@ -122,33 +172,40 @@ fun LeaderboardScreen(game: Game, viewModel: ScoreViewModel) {
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    if (hasTeams && soloOrder.isNotEmpty()) {
+                        item { SectionLabel("Teams") }
+                    }
                     items(
-                        count = standings.size,
-                        key = { index -> standings[index].first.id },
+                        count = teamOrder.size,
+                        key = { index -> "team-${game.teams[teamOrder[index].first].id}" },
                     ) { index ->
-                        val (player, score) = standings[index]
-                        val rank = ranks[index]
-                        val medal = medalFor(rank)
-                        val onMedal = medal != null
-                        val darkContent = Color(0xFF1A1A1A)
-                        ScoreCard(
-                            containerColor = medal
-                                ?: MaterialTheme.colorScheme.surfaceContainer,
-                        ) {
-                            ScoreListItem(
-                                playerName = player.name,
-                                supportingText = null,
-                                trailingText = "$score",
-                                trailingColor = if (onMedal) darkContent else Color(player.color),
-                                contentColor = if (onMedal) darkContent else null,
-                                leadingBadge = {
-                                    ListLeadingBadge(
-                                        rank = rank,
-                                        color = Color(player.color),
-                                    )
-                                },
-                            )
-                        }
+                        val (teamIdx, score) = teamOrder[index]
+                        val team = game.teams[teamIdx]
+                        val members = game.players.filter { it.teamId == team.id }
+                        StandingRow(
+                            name = team.name,
+                            supporting = members.joinToString(" \u2022 ") { it.name },
+                            score = score,
+                            color = Color(team.color),
+                            rank = rankOf(teamOrder.map { it.second }, score),
+                        )
+                    }
+                    if (hasTeams && soloOrder.isNotEmpty()) {
+                        item { SectionLabel("Players") }
+                    }
+                    items(
+                        count = soloOrder.size,
+                        key = { index -> game.players[soloOrder[index].first].id },
+                    ) { index ->
+                        val (playerIdx, score) = soloOrder[index]
+                        val player = game.players[playerIdx]
+                        StandingRow(
+                            name = player.name,
+                            supporting = null,
+                            score = score,
+                            color = Color(player.color),
+                            rank = rankOf(soloOrder.map { it.second }, score),
+                        )
                     }
                 }
             }
