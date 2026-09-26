@@ -186,7 +186,13 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
         ) {
             if (game != null) {
                 val teamMode = game.teams.isNotEmpty()
-                SettingsGroup(label = "Game Setup") {
+                // Scoreboard name sits in a bare card with no section
+                // header — it needs no introduction.
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    ),
+                ) {
                     // Local text state: pushing every keystroke into the
                     // viewmodel would rebuild this whole screen per character.
                     // Commits on Done, focus loss, or leaving the screen.
@@ -433,36 +439,6 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
             }
 
                 SettingsGroup(label = "System Options") {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        Text(
-                            "Theme",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        val mode = viewModel.themeMode.value
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            ThemeMode.entries.forEachIndexed { i, entry ->
-                                SegmentedButton(
-                                    selected = mode == entry,
-                                    onClick = { viewModel.setThemeMode(entry) },
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = i,
-                                        count = ThemeMode.entries.size,
-                                    ),
-                                ) {
-                                    Text(
-                                        when (entry) {
-                                            ThemeMode.SYSTEM -> "System"
-                                            ThemeMode.LIGHT -> "Light"
-                                            ThemeMode.DARK -> "Dark"
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
                         headlineContent = { Text("Haptics") },
                         supportingContent = { Text("Buzz on every full turn") },
@@ -513,6 +489,36 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                                     ) {
                                         Text(label)
                                     }
+                                }
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(
+                            "Theme",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val mode = viewModel.themeMode.value
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            ThemeMode.entries.forEachIndexed { i, entry ->
+                                SegmentedButton(
+                                    selected = mode == entry,
+                                    onClick = { viewModel.setThemeMode(entry) },
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = i,
+                                        count = ThemeMode.entries.size,
+                                    ),
+                                ) {
+                                    Text(
+                                        when (entry) {
+                                            ThemeMode.SYSTEM -> "System"
+                                            ThemeMode.LIGHT -> "Light"
+                                            ThemeMode.DARK -> "Dark"
+                                        }
+                                    )
                                 }
                             }
                         }

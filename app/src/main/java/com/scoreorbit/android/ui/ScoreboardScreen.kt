@@ -354,7 +354,7 @@ private fun computeLabelPositions(
     val stackOffset = labelBoxPx + with(density) { 12.dp.toPx() }
     // Minimum breathing room between a label and the ring/dots so
     // crowded boards never read as clipped into the dial.
-    val labelClearPx = with(density) { 28.dp.toPx() }
+    val labelClearPx = with(density) { 40.dp.toPx() }
     if (n >= 4) {
         // Fixed 3-column band grid in player order: the first
         // half of the players fills the top band left to right,
@@ -990,7 +990,17 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     (totals[boardOrder.first().id] ?: 0) >= target
                 ) boardOrder.first() else null
                 var celebratedAt by remember(game.id) { mutableIntStateOf(-1) }
-                if (champion != null && celebratedAt != game.entries.size) {
+                // Celebration waits out the score count-up (1200ms) plus a
+                // beat, so the dialog never covers the winning number landing.
+                var winnerReady by remember(game.id) { mutableStateOf(false) }
+                LaunchedEffect(champion?.id, game.entries.size) {
+                    winnerReady = false
+                    if (champion != null && celebratedAt != game.entries.size) {
+                        delay(2200)
+                        winnerReady = true
+                    }
+                }
+                if (champion != null && winnerReady && celebratedAt != game.entries.size) {
                     WinnerDialog(
                         standings = boardOrder.take(3).map { it to (totals[it.id] ?: 0) },
                         confettiColors = game.players.map { Color(it.color) },
