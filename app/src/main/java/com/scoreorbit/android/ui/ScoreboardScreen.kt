@@ -743,12 +743,13 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
 
             // Ring sized for the narrow side; dots sit on it. Both run 15% slimmed
             // down from raw scale so the dial doesn't crowd the labels.
-            // High counts get a slightly smaller dial so the label bands
-            // keep generous clearance instead of crowding the ring.
+            // Crowded boards get a smaller dial outright: pushing rows away
+            // from a big ring just shoves them into each other, so the room
+            // has to come from the dial itself.
             val ringR = minDim * when {
                 n <= 6 -> 0.34f
-                n <= 8 -> 0.32f
-                else -> 0.30f
+                n <= 8 -> 0.28f
+                else -> 0.26f
             }
             val share = (2 * PI.toFloat() * ringR / n) * 0.68f
             val dotD = (share.coerceIn(
@@ -771,10 +772,11 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 else -> {
                     // Band grid uses 3 fixed columns: size the box from the
                     // column width so scores fill the free space instead of
-                    // squeezing into per-seat columns.
+                    // squeezing into per-seat columns. Crowded boards cap
+                    // smaller so rows keep air between them.
                     val gap = with(density) { 4.dp.toPx() }
                     ((wPx - 2 * edgeMarginPx - 2 * gap) / 3f)
-                        .coerceIn(with(density) { 72.dp.toPx() }, with(density) { 100.dp.toPx() })
+                        .coerceIn(with(density) { 64.dp.toPx() }, with(density) { 84.dp.toPx() })
                 }
             }
             val scoreSp = (labelBoxPx * 0.44f / density.density).coerceIn(20f, 64f)
