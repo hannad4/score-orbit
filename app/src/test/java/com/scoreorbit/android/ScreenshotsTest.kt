@@ -174,4 +174,32 @@ class ScreenshotsTest {
         }
     }
 
+    private fun demoCrowdedGame(): Game {
+        val colors = ScoreOrbitColors.PlayerColors
+        val names = listOf("Joey", "Stu", "Tomas", "Sofia", "Ana", "Ben", "Cleo", "Dan")
+        val players = names.mapIndexed { i, name ->
+            Player(id = "p${i + 1}", name = name, color = colors[i % colors.size])
+        }
+        val entries = players.mapIndexed { i, p ->
+            ScoreEntry(id = "e${i + 1}", playerId = p.id, delta = 10 + i * 7)
+        }
+        return Game(
+            name = "Game Night",
+            players = players,
+            rotationPoints = 10,
+            tapPoints = 1,
+            entries = entries,
+        )
+    }
+
+    @Test
+    fun crowdedBoard() {
+        val game = demoCrowdedGame()
+        paparazzi.snapshot {
+            ScoreOrbitTheme(dynamicColor = false) {
+                ScoreboardScreen(game = game, viewModel = stubViewModel())
+            }
+        }
+    }
+
 }

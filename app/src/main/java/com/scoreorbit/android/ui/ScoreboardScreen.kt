@@ -353,8 +353,16 @@ private fun computeLabelPositions(
     val positions = arrayOfNulls<Offset>(n)
     val stackOffset = labelBoxPx + with(density) { 12.dp.toPx() }
     // Minimum breathing room between a label and the ring/dots so
-    // crowded boards never read as clipped into the dial.
-    val labelClearPx = with(density) { 40.dp.toPx() }
+    // crowded boards never read as clipped into the dial. Small boards
+    // get generous air; crowded ones trade some of it so the bands fit
+    // without shoving rows into the ring.
+    val labelClearPx = with(density) {
+        when {
+            n <= 4 -> 40.dp.toPx()
+            n <= 6 -> 32.dp.toPx()
+            else -> 24.dp.toPx()
+        }
+    }
     if (n >= 4) {
         // Fixed 3-column band grid in player order: the first
         // half of the players fills the top band left to right,
@@ -989,22 +997,24 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 val champion = if (target != null && boardOrder.isNotEmpty() &&
                     (totals[boardOrder.first().id] ?: 0) >= target
                 ) boardOrder.first() else null
-                var celebratedAt by remember(game.id) { mutableIntStateOf(-1) }
                 // Celebration waits out the score count-up (1200ms) plus a
-                // beat, so the dialog never covers the winning number landing.
+                // beat, so the dialog never covers the winning number
+                // landing. Dismissing ("keep playing") ends celebrations for
+                // this game entirely; a new game resets it.
+                var celebrationDismissed by remember(game.id) { mutableStateOf(false) }
                 var winnerReady by remember(game.id) { mutableStateOf(false) }
                 LaunchedEffect(champion?.id, game.entries.size) {
                     winnerReady = false
-                    if (champion != null && celebratedAt != game.entries.size) {
-                        delay(2200)
+                    if (champion != null && !celebrationDismissed) {
+                        delay(1800)
                         winnerReady = true
                     }
                 }
-                if (champion != null && winnerReady && celebratedAt != game.entries.size) {
+                if (champion != null && winnerReady && !celebrationDismissed) {
                     WinnerDialog(
                         standings = boardOrder.take(3).map { it to (totals[it.id] ?: 0) },
                         confettiColors = game.players.map { Color(it.color) },
-                        onKeepPlaying = { celebratedAt = game.entries.size },
+                        onKeepPlaying = { celebrationDismissed = true },
                         onNewGame = { viewModel.restartWithSameSetup() },
                     )
                 }
