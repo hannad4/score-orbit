@@ -256,6 +256,8 @@ private fun computeZones(
     wPx: Float,
     hPx: Float,
     labelBoxPx: Float,
+    ringR: Float,
+    dotD: Float,
     density: Density,
 ): List<Zone> {
     val teamGroups = teams.filter { t -> players.any { it.teamId == t.id } }
@@ -324,10 +326,32 @@ private fun computeZones(
                 val gx = k % cols
                 val x = cx + (gx - (rowLen - 1) / 2f) * step
                 val y = cy + (gy - (rows - 1) / 2f) * step
-                ZoneMember(pi, Offset(x, y), box)
+                // Same hard guarantee as the band grid: grid cells near the
+                // dial's inner corner get pushed back out radially.
+                val pushed = pushOutsideRing(
+                    Offset(rect.l + x, rect.t + y),
+                    wPx / 2f, hPx / 2f,
+                    ringR + dotD / 2f + box / 2f + with(density) { 12.dp.toPx() },
+                )
+                ZoneMember(pi, Offset(pushed.x - rect.l, pushed.y - rect.t), box)
             }
             Zone(rect, team, corners[zi], members)
         }
+}
+
+/**
+ * Hard guarantee: no label may touch the ring. The guard is box-aware —
+ * the label's ring-facing edge (half the box plus a gap) must clear the
+ * track, not just its center — because soft clearances size the layout
+ * while compression and odd aspect ratios can still shove a row into the
+ * dial. Intruders get pushed back out along their own ray. Runs before
+ * the on-screen clamp.
+ */
+private fun pushOutsideRing(p: Offset, cx: Float, cy: Float, minDist: Float): Offset {
+    val dx = p.x - cx
+    val dy = p.y - cy
+    val d = sqrt(dx * dx + dy * dy)
+    return if (d < minDist && d > 1e-3f) Offset(cx + dx / d * minDist, cy + dy / d * minDist) else p
 }
 
 /**
@@ -403,7 +427,11 @@ private fun computeLabelPositions(
                 val rr = if (sign < 0f) rows.size - 1 - r else r
                 row.forEachIndexed { c, i ->
                     val d = (nearD + rr * rowPitch + labelBoxPx / 2f) * vFit
-                    positions[i] = Offset(xs[c], cy + sign * d)
+                    positions[i] = pushOutsideRing(
+                        Offset(xs[c], cy + sign * d),
+                        cx, cy,
+                        ringR + dotD / 2f + labelBoxPx / 2f + with(density) { 12.dp.toPx() },
+                    )
                 }
             }
         }
@@ -755,8 +783,8 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             // chip. Solo-only games keep the legacy edge layout exactly.
             val zoned = game.players.any { it.teamId != null }
             val zones: List<Zone> = if (zoned) {
-                remember(game.players, game.teams, wPx, layoutH, labelBoxPx, density) {
-                    computeZones(game.players, game.teams, wPx, layoutH, labelBoxPx, density)
+                remember(game.players, game.teams, wPx, layoutH, labelBoxPx, ringR, dotD, density) {
+                    computeZones(game.players, game.teams, wPx, layoutH, labelBoxPx, ringR, dotD, density)
                 }
             } else emptyList()
             // Scores pushed out to the screen edges (memoized: pure layout
