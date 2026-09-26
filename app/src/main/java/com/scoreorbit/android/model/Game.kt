@@ -42,6 +42,8 @@ data class Game(
     val rotationPoints: Int = 10,
     val tapPoints: Int = 0,
     val winMetric: WinMetric = WinMetric.HIGHEST,
+    /** First-to-target score that ends the game, or null for endless scoring. */
+    val targetScore: Int? = null,
     val keepLastVisible: Boolean = false,
     val enlargeActiveDot: Boolean = false,
     val showPlayerNames: Boolean = true,

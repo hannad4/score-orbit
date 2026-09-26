@@ -323,39 +323,57 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                             }
                         }
                     }
-                }
-
-                SettingsGroup(label = "Appearance") {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        Text(
-                            "Theme",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        val mode = viewModel.themeMode.value
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            ThemeMode.entries.forEachIndexed { i, entry ->
-                                SegmentedButton(
-                                    selected = mode == entry,
-                                    onClick = { viewModel.setThemeMode(entry) },
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = i,
-                                        count = ThemeMode.entries.size,
-                                    ),
-                                ) {
-                                    Text(
-                                        when (entry) {
-                                            ThemeMode.SYSTEM -> "System"
-                                            ThemeMode.LIGHT -> "Light"
-                                            ThemeMode.DARK -> "Dark"
-                                        }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    // Target score: blank means endless scoring. Commits on
+                    // Done or focus loss (like the board name) so a
+                    // half-typed number never declares a winner mid-typing.
+                    var targetField by remember(game.id, game.targetScore) {
+                        mutableStateOf(game.targetScore?.toString() ?: "")
+                    }
+                    fun commitTarget() {
+                        val v = targetField.filter { it.isDigit() }.toIntOrNull()
+                        viewModel.setTargetScore(v)
+                        targetField = v?.toString() ?: ""
+                    }
+                    OutlinedTextField(
+                        value = targetField,
+                        onValueChange = { targetField = it.filter { c -> c.isDigit() }.take(5) },
+                        label = { Text("Score to Win") },
+                        supportingText = { Text("Blank for endless scoring") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Done,
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                commitTarget()
+                                focusManager.clearFocus()
+                            }
+                        ),
+                        trailingIcon = {
+                            if (targetField.isNotEmpty()) {
+                                IconButton(onClick = {
+                                    targetField = ""
+                                    viewModel.setTargetScore(null)
+                                }) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Clear target",
                                     )
                                 }
                             }
-                        }
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .onFocusChanged { focus ->
+                                if (!focus.isFocused) commitTarget()
+                            },
+                    )
+                }
+
+                SettingsGroup(label = "Board View") {
                     ListItem(
                         headlineContent = { Text("Show Player Names") },
                         supportingContent = { Text("Display names beside scores") },
@@ -393,6 +411,57 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    ListItem(
+                        headlineContent = { Text("Show Last Score") },
+                        supportingContent = { Text("Keep the last score visible until the next player scores") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Visibility,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                            checked = game.keepLastVisible,
+                            onCheckedChange = { viewModel.setKeepLastVisible(it) },
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                )
+            }
+
+                SettingsGroup(label = "System Options") {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(
+                            "Theme",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val mode = viewModel.themeMode.value
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            ThemeMode.entries.forEachIndexed { i, entry ->
+                                SegmentedButton(
+                                    selected = mode == entry,
+                                    onClick = { viewModel.setThemeMode(entry) },
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = i,
+                                        count = ThemeMode.entries.size,
+                                    ),
+                                ) {
+                                    Text(
+                                        when (entry) {
+                                            ThemeMode.SYSTEM -> "System"
+                                            ThemeMode.LIGHT -> "Light"
+                                            ThemeMode.DARK -> "Dark"
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
                         headlineContent = { Text("Haptics") },
@@ -448,27 +517,8 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                             }
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    ListItem(
-                        headlineContent = { Text("Show Last Score") },
-                        supportingContent = { Text("Keep the last score visible until the next player scores") },
-                        leadingContent = {
-                            Icon(
-                                Icons.Default.Visibility,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        trailingContent = {
-                            Switch(
-                                checked = game.keepLastVisible,
-                                onCheckedChange = { viewModel.setKeepLastVisible(it) },
-                            )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    )
                 }
-            } else {
+        } else {
                 // No active game (just finished): offer a fresh one.
                 Button(
                     onClick = {

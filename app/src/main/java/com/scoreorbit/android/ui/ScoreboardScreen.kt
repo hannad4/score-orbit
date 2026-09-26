@@ -10,13 +10,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,8 +27,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -33,7 +40,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -52,6 +61,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -65,9 +75,12 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.scoreorbit.android.model.Game
 import com.scoreorbit.android.model.Player
 import com.scoreorbit.android.model.Team
+import com.scoreorbit.android.model.WinMetric
 import com.scoreorbit.android.util.RotationUtils
 import com.scoreorbit.android.viewmodel.AppScreen
 import com.scoreorbit.android.viewmodel.ScoreViewModel
@@ -82,6 +95,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.random.Random
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -961,6 +975,30 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     }
                 }
 
+                // Race to the target: the leader at or past it ends the game
+                // with confetti. Dismissing ("keep playing") snoozes the
+                // celebration until the next score lands; a new game resets
+                // it.
+                val target = game.targetScore
+                val boardOrder = remember(totals, game.players, game.winMetric) {
+                    game.players.sortedWith(
+                        if (game.winMetric == WinMetric.LOWEST) compareBy { totals[it.id] ?: 0 }
+                        else compareByDescending { totals[it.id] ?: 0 }
+                    )
+                }
+                val champion = if (target != null && boardOrder.isNotEmpty() &&
+                    (totals[boardOrder.first().id] ?: 0) >= target
+                ) boardOrder.first() else null
+                var celebratedAt by remember(game.id) { mutableIntStateOf(-1) }
+                if (champion != null && celebratedAt != game.entries.size) {
+                    WinnerDialog(
+                        standings = boardOrder.take(3).map { it to (totals[it.id] ?: 0) },
+                        confettiColors = game.players.map { Color(it.color) },
+                        onKeepPlaying = { celebratedAt = game.entries.size },
+                        onNewGame = { viewModel.restartWithSameSetup() },
+                    )
+                }
+
                 game.players.forEachIndexed { i, player ->
                     // While dragging, the whole wheel of dots turns together
                     // with the touch (a real rotary dial's disk), rather than
@@ -1226,8 +1264,165 @@ private fun trailFadeColors(color: Color, tipDeg: Float, clockwise: Boolean): Li
     }
 }
 
-/** Team name + collective total. Display only — never consumes touches. */
+/**
+ * Winner celebration for race-to-target games: confetti over the whole
+ * screen, trophy + winner name, second and third below. Dependency-free
+ * confetti — a single Canvas driven by one 0->1 animation.
+ */
 @Composable
+private fun WinnerDialog(
+    standings: List<Pair<Player, Int>>,
+    confettiColors: List<Color>,
+    onKeepPlaying: () -> Unit,
+    onNewGame: () -> Unit,
+) {
+    val winner = standings.firstOrNull()
+    Dialog(
+        onDismissRequest = onKeepPlaying,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+        ),
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            ConfettiOverlay(colors = confettiColors, modifier = Modifier.fillMaxSize())
+            Card(
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                ),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(24.dp),
+                ) {
+                    Icon(
+                        Icons.Default.EmojiEvents,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD700),
+                        modifier = Modifier.size(56.dp),
+                    )
+                    if (winner != null) {
+                        Text(
+                            text = winner.first.name,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(winner.first.color),
+                            textAlign = TextAlign.Center,
+                        )
+                        Text(
+                            text = "wins!",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    standings.drop(1).forEachIndexed { i, (player, score) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = "#${i + 2} ${player.name}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = "$score",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(player.color),
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        TextButton(
+                            onClick = onKeepPlaying,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Keep playing")
+                        }
+                        Button(
+                            onClick = onNewGame,
+                            shape = MaterialTheme.shapes.extraLarge,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("New game")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConfettiOverlay(colors: List<Color>, modifier: Modifier = Modifier) {
+    data class Piece(
+        val x0: Float,
+        val delay: Float,
+        val vx: Float,
+        val vy: Float,
+        val size: Float,
+        val color: Color,
+        val rot0: Float,
+        val vr: Float,
+        val sway: Float,
+    )
+    val pieces = remember(colors) {
+        val rnd = Random(7)
+        val palette = colors.ifEmpty { listOf(Color.White) }
+        List(130) {
+            Piece(
+                x0 = rnd.nextFloat(),
+                delay = rnd.nextFloat() * 0.35f,
+                vx = (rnd.nextFloat() - 0.5f) * 0.12f,
+                vy = 0.55f + rnd.nextFloat() * 0.6f,
+                size = 8f + rnd.nextFloat() * 14f,
+                color = palette[rnd.nextInt(palette.size)],
+                rot0 = rnd.nextFloat() * 360f,
+                vr = (rnd.nextFloat() - 0.5f) * 720f,
+                sway = 0.02f + rnd.nextFloat() * 0.05f,
+            )
+        }
+    }
+    var progress by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) {
+        animate(0f, 1f, animationSpec = tween(durationMillis = 2800)) { value, _ ->
+            progress = value
+        }
+    }
+    Canvas(modifier = modifier) {
+        pieces.forEach { p ->
+            val t = ((progress - p.delay) / (1f - p.delay)).coerceIn(0f, 1f)
+            if (t <= 0f) return@forEach
+            val x = (p.x0 + p.vx * t + sin(t * 9f + p.rot0) * p.sway) * size.width
+            val y = -40f + (size.height + 80f) * p.vy * t
+            val alpha = ((1f - t) / 0.3f).coerceIn(0f, 1f)
+            rotate(p.rot0 + p.vr * t, pivot = Offset(x, y)) {
+                drawRect(
+                    color = p.color.copy(alpha = alpha),
+                    topLeft = Offset(x, y),
+                    size = Size(p.size, p.size * 0.6f),
+                )
+            }
+        }
+    }
+}
+
+/** Team name + collective total. Display only — never consumes touches. */@Composable
 private fun TeamTotalChip(team: Team, total: Int, modifier: Modifier = Modifier) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

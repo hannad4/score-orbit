@@ -86,6 +86,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         tapPoints: Int,
         boardName: String = "",
         winMetric: WinMetric = WinMetric.HIGHEST,
+        targetScore: Int? = null,
         keepLastVisible: Boolean = false,
         enlargeActiveDot: Boolean = false,
         showPlayerNames: Boolean = true,
@@ -111,6 +112,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             rotationPoints = rotationPoints.coerceIn(1, 100),
             tapPoints = tapPoints.coerceIn(0, 100),
             winMetric = winMetric,
+            targetScore = targetScore?.takeIf { it >= 1 },
             keepLastVisible = keepLastVisible,
             enlargeActiveDot = enlargeActiveDot,
             showPlayerNames = showPlayerNames,
@@ -134,6 +136,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             tapPoints = game.tapPoints,
             boardName = game.name,
             winMetric = game.winMetric,
+            targetScore = game.targetScore,
             keepLastVisible = game.keepLastVisible,
             enlargeActiveDot = game.enlargeActiveDot,
             showPlayerNames = game.showPlayerNames,
@@ -206,6 +209,12 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setWinMetric(metric: WinMetric) {
         _currentGame.value = _currentGame.value?.copy(winMetric = metric)
+        persist()
+    }
+
+    /** Null (or anything below 1) means endless scoring. */
+    fun setTargetScore(target: Int?) {
+        _currentGame.value = _currentGame.value?.copy(targetScore = target?.takeIf { it >= 1 })
         persist()
     }
 
@@ -419,6 +428,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         .put("rotationPoints", game.rotationPoints)
         .put("tapPoints", game.tapPoints)
         .put("winMetric", game.winMetric.name)
+        .put("targetScore", game.targetScore ?: JSONObject.NULL)
         .put("keepLastVisible", game.keepLastVisible)
         .put("enlargeActiveDot", game.enlargeActiveDot)
         .put("showPlayerNames", game.showPlayerNames)
@@ -473,6 +483,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             tapPoints = o.optInt("tapPoints", 0),
             winMetric = runCatching { WinMetric.valueOf(o.getString("winMetric")) }
                 .getOrDefault(WinMetric.HIGHEST),
+            targetScore = if (o.isNull("targetScore")) null else o.optInt("targetScore").takeIf { it >= 1 },
             keepLastVisible = o.optBoolean("keepLastVisible", false),
             enlargeActiveDot = o.optBoolean("enlargeActiveDot", false),
             showPlayerNames = o.optBoolean("showPlayerNames", true),
