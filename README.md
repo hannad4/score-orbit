@@ -8,7 +8,7 @@ The problem it solves is a familiar one: keeping score on paper means hunting fo
 
 ## How a game goes
 
-You set up 1–12 players with names and colors, choose how many points a full revolution and a tap are worth, and whether the highest or lowest score wins. Then you just play - the board stays on the table and anyone can reach over and dial in their own points.
+You set up 1–12 players with names and colors, choose how many points a full revolution and a tap are worth, and whether the highest or lowest score wins. Then you just play - the board stays on the table and anyone can reach over and dial in their own points. Long-press a score and drag it onto another seat to swap the two players around.
 
 Scores land in a running ledger with undo and redo, so mis-taps are one button press to fix. When the game ends, the leaderboard ranks everyone with medal highlights for the top three.
 

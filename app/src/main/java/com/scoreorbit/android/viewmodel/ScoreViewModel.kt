@@ -313,6 +313,20 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         persist()
     }
 
+    /** Exchange two seats (board drag-and-drop). Entries reference ids, so scores follow. */
+    fun swapPlayers(a: String, b: String) {
+        val game = _currentGame.value ?: return
+        val ia = game.players.indexOfFirst { it.id == a }
+        val ib = game.players.indexOfFirst { it.id == b }
+        if (ia < 0 || ib < 0 || ia == ib) return
+        val list = game.players.toMutableList()
+        val tmp = list[ia]
+        list[ia] = list[ib]
+        list[ib] = tmp
+        _currentGame.value = game.copy(players = list)
+        persist()
+    }
+
     // -- teams ---------------------------------------------------------------
     // Four quadrant zones max, so four teams max. The board gives each
     // non-empty team (plus solos, if any) its own zone; anything beyond

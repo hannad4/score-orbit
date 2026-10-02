@@ -3,12 +3,15 @@ package com.scoreorbit.android.ui
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.animateIntOffsetAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,7 +46,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +64,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -99,6 +105,19 @@ import kotlin.random.Random
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/**
+ * Geometry snapshot the seat-swap tracker reads through. The label
+ * detectors keep running across live swaps without restarting, so they
+ * may only read geometry through this stable handle — never captured
+ * arrays, which go stale the moment the roster changes.
+ */
+private data class BoardGeo(
+    val players: List<Player>,
+    val dots: DoubleArray,
+    val centers: Array<Offset?>,
+    val boxes: FloatArray,
+)
 
 /**
  * Seat angle in radians for [index] of [total] (clockwise, y-down). Seat 0
@@ -544,6 +563,16 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
 
     var activeId by remember(game.id) { mutableStateOf<String?>(null) }
     var pending by remember(game.id) { mutableIntStateOf(0) }
+    // Seat-swap drag: long-press a score to pick it up, carry it onto
+    // another seat, and the two trade places live (like roster reorder).
+    // Swaps commit the moment seats cross. Two flags because teardown
+    // ordering between the label and board detectors can't be assumed:
+    // swapId drives the visuals and is cleared by BOTH teardowns, while
+    // swapEngaged latches dial-suppression and is cleared by both too.
+    // Every ordering ends clean.
+    var swapId by remember(game.id) { mutableStateOf<String?>(null) }
+    var swapEngaged by remember(game.id) { mutableStateOf(false) }
+    var swapEndTime by remember(game.id) { mutableStateOf(0L) }
     var accRadians by remember(game.id) { mutableFloatStateOf(0f) }
     var lastAngle by remember { mutableFloatStateOf(Float.NaN) }
     // Last committed action, flashed in the middle of the ring as name +
@@ -835,15 +864,35 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             val dotAngles: DoubleArray = remember(labelPositions, cx, cy, ringR, dotD) {
                 computeDotAngles(labelPositions, cx, cy, ringR, dotD)
             }
+            // Geometry handle for the seat-swap trackers. Updated every
+            // composition, read fresh on every touch event through the
+            // stable object (the conditional write converges immediately).
+            val boardGeoState = remember { mutableStateOf(BoardGeo(game.players, dotAngles, labelPositions, memberBoxPx)) }
+            val freshGeo = remember(game.players, dotAngles, labelPositions, memberBoxPx) {
+                BoardGeo(game.players, dotAngles, labelPositions, memberBoxPx)
+            }
+            if (boardGeoState.value !== freshGeo) boardGeoState.value = freshGeo
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(game.id, game.rotationPoints) {
+                    // Keyed on the roster too: seat geometry captured here
+                    // must never go stale across swaps (a restart only ever
+                    // happens between gestures — roster changes can't occur
+                    // mid-dial-spin, and swaps own their gestures).
+                    .pointerInput(game.id, game.players, game.rotationPoints) {
+                        // Per-gesture witnesses: did THIS gesture see swap
+                        // activity, and what was the swap clock when it
+                        // started? Combined with the latch they identify a
+                        // swap ending under any teardown ordering.
+                        var sawSwap = false
+                        var startMark = 0L
                         detectDragGestures(
                             onDragStart = { offset ->
                                 val g = latestGame
                                 if (g.players.isEmpty()) return@detectDragGestures
+                                sawSwap = false
+                                startMark = swapEndTime
                                 // Grabbing the dial again mid spring-back cancels the
                                 // return animation instead of fighting it for control
                                 // of accRadians.
@@ -872,12 +921,38 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 accRadians = 0f
                                 pending = 0
                             },
-                            onDragEnd = { commitGesture() },
+                            onDragEnd = {
+                                // Reset unless this was a pure dial gesture.
+                                // Any one of these independently proves a
+                                // swap was involved, so no teardown ordering
+                                // can misroute into a score commit.
+                                if (sawSwap || swapEngaged || swapEndTime != startMark) {
+                                    resetGesture()
+                                    swapId = null
+                                    swapEngaged = false
+                                } else {
+                                    commitGesture()
+                                }
+                            },
                             // A cancelled gesture (incoming call, etc.) still
                             // keeps completed points instead of dropping them.
-                            onDragCancel = { commitGesture() },
+                            onDragCancel = {
+                                if (sawSwap || swapEngaged || swapEndTime != startMark) {
+                                    resetGesture()
+                                    swapId = null
+                                    swapEngaged = false
+                                } else {
+                                    commitGesture()
+                                }
+                            },
                             onDrag = { change, _ ->
                                 change.consume()
+                                // A seat-swap owns this gesture: the dial
+                                // stays out of it entirely.
+                                if (swapEngaged) {
+                                    sawSwap = true
+                                    return@detectDragGestures
+                                }
                                 if (activeId == null) return@detectDragGestures
                                 if (lastAngle.isNaN()) {
                                     lastAngle = atan2(
@@ -1071,37 +1146,85 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             viewModel.addScore(player.id, game.tapPoints)
                             showFlash(player.color, game.tapPoints, player.name)
                         },
+                        animatePlacement = activeId == null,
                     )
                 }
 
                 // Render all labels (positions already clamped on-screen by
                 // computeLabelPositions, or fitted to their zone in team
                 // mode).
+                // Tap-to-rotate yields while a swap gesture is in flight or
+                // just ended (the release tap would otherwise also rotate).
+                fun tapAllowed(): Boolean =
+                    !swapEngaged && swapId == null && System.nanoTime() - swapEndTime > 250_000_000L
+                // Haptic + dial feedback. Reads current state at call time,
+                // so detectors may hold this reference across swaps.
+                fun feedback(millis: Long) {
+                    if (latestGame.hapticsEnabled) {
+                        buzz(ctx, millis, latestGame.hapticStrength)
+                    }
+                }
                 if (!zoned) {
                     game.players.forEachIndexed { i, player ->
                         val pos = labelPositions[i]!!
                         val isActive = activeId == player.id
-                        SeatScore(
-                            player = player,
-                            // The edge score always shows the player's committed
-                            // total; the live spin delta lives only in the center
-                            // readout while swiping, then commits on release.
-                            score = totals[player.id] ?: 0,
-                            showName = game.showPlayerNames,
-                            scoreSp = memberScoreSp(memberBoxPx[i]),
-                            boxDp = dp(memberBoxPx[i]),
-                            dimmed = activeId != null && !isActive,
-                            offsetPx = IntOffset(
-                                x = (pos.x - memberBoxPx[i] / 2f).toInt(),
-                                y = (pos.y - memberBoxPx[i] / 2f).toInt(),
-                            ),
-                            onTap = {
-                                if (game.hapticsEnabled) {
-                                    buzz(ctx, 20, game.hapticStrength)
-                                }
-                                viewModel.rotatePlayer(player.id)
-                            },
+                        val off = IntOffset(
+                            x = (pos.x - memberBoxPx[i] / 2f).toInt(),
+                            y = (pos.y - memberBoxPx[i] / 2f).toInt(),
                         )
+                        key(player.id) {
+                            SeatScore(
+                                player = player,
+                                // The edge score always shows the player's committed
+                                // total; the live spin delta lives only in the center
+                                // readout while swiping, then commits on release.
+                                score = totals[player.id] ?: 0,
+                                showName = game.showPlayerNames,
+                                scoreSp = memberScoreSp(memberBoxPx[i]),
+                                boxDp = dp(memberBoxPx[i]),
+                                dimmed = activeId != null && !isActive,
+                                offsetPx = off,
+                                geo = boardGeoState,
+                                isDragged = swapId == player.id,
+                                feedback = { millis ->
+                                    if (latestGame.hapticsEnabled) {
+                                        buzz(ctx, millis, latestGame.hapticStrength)
+                                    }
+                                },
+                                onSwapStart = {
+                                    if (swapId != null) {
+                                        false
+                                    } else {
+                                        swapId = player.id
+                                        swapEngaged = true
+                                        activeId = null
+                                        pending = 0
+                                        true
+                                    }
+                                },
+                                onSwapPair = { target ->
+                                    viewModel.swapPlayers(player.id, target)
+                                },
+                                onSwapEnd = {
+                                    // Drop everything here, not just in the
+                                    // board teardown: whichever runs first
+                                    // fully recovers, the other is a no-op.
+                                    swapId = null
+                                    swapEngaged = false
+                                    swapEndTime = System.nanoTime()
+                                },
+                                glideBase = swapId != player.id &&
+                                    System.nanoTime() - swapEndTime > 350_000_000L,
+                                onTap = {
+                                    if (tapAllowed()) {
+                                        if (game.hapticsEnabled) {
+                                            buzz(ctx, 20, game.hapticStrength)
+                                        }
+                                        viewModel.rotatePlayer(player.id)
+                                    }
+                                },
+                            )
+                        }
                     }
                 } else {
                     // Team zones: tinted quadrant, total chip in the outer
@@ -1134,24 +1257,61 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             }
                             zone.members.forEach { m ->
                                 val player = game.players[m.playerIndex]
-                                SeatScore(
-                                    player = player,
-                                    score = totals[player.id] ?: 0,
-                                    showName = game.showPlayerNames,
-                                    scoreSp = memberScoreSp(m.boxPx),
-                                    boxDp = dp(m.boxPx),
-                                    dimmed = activeId != null && activeId != player.id,
-                                    offsetPx = IntOffset(
-                                        x = (m.local.x - m.boxPx / 2f).toInt(),
-                                        y = (m.local.y - m.boxPx / 2f).toInt(),
-                                    ),
-                                    onTap = {
-                                        if (game.hapticsEnabled) {
-                                            buzz(ctx, 20, game.hapticStrength)
-                                        }
-                                        viewModel.rotatePlayer(player.id)
-                                    },
+                                val off = IntOffset(
+                                    x = (m.local.x - m.boxPx / 2f).toInt(),
+                                    y = (m.local.y - m.boxPx / 2f).toInt(),
                                 )
+                                key(player.id) {
+                                    SeatScore(
+                                        player = player,
+                                        score = totals[player.id] ?: 0,
+                                        showName = game.showPlayerNames,
+                                        scoreSp = memberScoreSp(m.boxPx),
+                                        boxDp = dp(m.boxPx),
+                                        dimmed = activeId != null && activeId != player.id,
+                                        offsetPx = off,
+                                        geo = boardGeoState,
+                                        isDragged = swapId == player.id,
+                                        feedback = { millis ->
+                                            if (latestGame.hapticsEnabled) {
+                                                buzz(ctx, millis, latestGame.hapticStrength)
+                                            }
+                                        },
+                                        onSwapStart = {
+                                            if (swapId != null) {
+                                                false
+                                            } else {
+                                                swapId = player.id
+                                                swapEngaged = true
+                                                activeId = null
+                                                pending = 0
+                                                true
+                                            }
+                                        },
+                                        onSwapPair = { target ->
+                                            viewModel.swapPlayers(player.id, target)
+                                        },
+                                        onSwapEnd = {
+                                            // Drop everything here, not just
+                                            // in the board teardown: whichever
+                                            // runs first fully recovers, the
+                                            // other is a no-op.
+                                            swapId = null
+                                            swapEngaged = false
+                                            swapEndTime = System.nanoTime()
+                                        },
+                                        glideBase = swapId != player.id &&
+                                            System.nanoTime() - swapEndTime > 350_000_000L,
+                                        onTap = {
+                                            if (tapAllowed()) {
+                                                if (game.hapticsEnabled) {
+                                                    buzz(ctx, 20, game.hapticStrength)
+                                                }
+                                                viewModel.rotatePlayer(player.id)
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -1496,17 +1656,29 @@ private fun TeamTotalChip(team: Team, total: Int, modifier: Modifier = Modifier)
     }
 }
 
-/** One player dot on the ring. Split out so untouched dots skip recomposition. */@Composable
+/** One player dot on the ring. Split out so untouched dots skip recomposition. */
+@Composable
 private fun SeatDot(
     color: Color,
     sizeDp: Dp,
     alpha: Float,
     offsetPx: IntOffset,
     onTap: () -> Unit,
+    animatePlacement: Boolean = true,
 ) {
+    // Glide between seats on swaps. Raw while the dial is turning, where
+    // the target moves every frame and any lag would detach the dots.
+    val glidingOffset by animateIntOffsetAsState(
+        targetValue = offsetPx,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "dotSlide",
+    )
     Box(
         modifier = Modifier
-            .offset { offsetPx }
+            .offset { if (animatePlacement) glidingOffset else offsetPx }
             .size(sizeDp)
             .alpha(alpha)
             .clip(CircleShape)
@@ -1523,6 +1695,11 @@ private fun SeatDot(
  * Score label near the screen edge. Square box (rotation-proof bounds);
  * tap rotates it 90° to face its player. Split out so only the active
  * player's label recomposes while a swipe is in progress.
+ *
+ * Long-press picks the label up: it lifts, follows the finger, and live-
+ * swaps with whatever seat it crosses (like roster reorder). Geometry
+ * comes only through [geo], because this tracker outlives the swaps it
+ * causes and captured arrays would go stale after the first one.
  */
 @Composable
 private fun SeatScore(
@@ -1534,6 +1711,13 @@ private fun SeatScore(
     dimmed: Boolean,
     offsetPx: IntOffset,
     onTap: () -> Unit,
+    geo: State<BoardGeo>,
+    isDragged: Boolean,
+    feedback: (Long) -> Unit,
+    onSwapStart: () -> Boolean,
+    onSwapPair: (String) -> Unit,
+    onSwapEnd: () -> Unit,
+    glideBase: Boolean = true,
 ) {
     val color = Color(player.color)
     // Count up/down to the new total instead of jumping to it. At rest the
@@ -1546,12 +1730,125 @@ private fun SeatScore(
     val text = "$shown"
     val digits = text.filter { it.isDigit() }.length
     val size = (scoreSp - (digits - 1).coerceAtLeast(0) * 2.5f).coerceAtLeast(14f)
+    // Carry translation: finger position minus grab point, both in board
+    // coords. The offset lambda below restarts on change without
+    // recomposing, so following the finger costs relayout, not redraw.
+    var carry by remember { mutableStateOf(Offset.Zero) }
+    // Glide between seats on swaps. Suspended while carried and briefly
+    // after the drop, so the visual never lags the finger or replays the
+    // trip once released — the base tracks the layout exactly instead.
+    // (The animation keeps running underneath and is settled by the time
+    // gliding resumes, so the handoff is invisible.)
+    val animatedBase by animateIntOffsetAsState(
+        targetValue = offsetPx,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "seatSlide",
+    )
+    val glidingBase = if (glideBase) animatedBase else offsetPx
     Box(
         modifier = Modifier
-            .offset { offsetPx }
+            .offset {
+                glidingBase + IntOffset(carry.x.roundToInt(), carry.y.roundToInt())
+            }
             .size(boxDp)
             .alpha(if (dimmed) 0.4f else 1f)
+            .pointerInput(player.id) {
+                var finger = Offset.Zero
+                var grab = Offset.Zero
+                var coolPartner = ""
+                var coolUntil = 0L
+                // Only the label that won the ownership claim tracks the
+                // gesture; an overlapping loser must stay out entirely.
+                var owned = false
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        owned = false
+                        val g = geo.value
+                        val idx = g.players.indexOfFirst { it.id == player.id }
+                        val c = g.centers.getOrNull(idx)
+                        if (idx < 0 || c == null || !onSwapStart()) {
+                            return@detectDragGesturesAfterLongPress
+                        }
+                        owned = true
+                        finger = c
+                        grab = c
+                        carry = Offset.Zero
+                        coolPartner = ""
+                        feedback(30)
+                    },
+                    onDrag = { change, amount ->
+                        if (!owned) return@detectDragGesturesAfterLongPress
+                        change.consume()
+                        finger += Offset(amount.x, amount.y)
+                        carry = finger - grab
+                        val g = geo.value
+                        val idx = g.players.indexOfFirst { it.id == player.id }
+                        if (idx < 0) return@detectDragGesturesAfterLongPress
+                        val myBox = g.boxes.getOrElse(idx) { 0f }
+                        val now = System.nanoTime()
+                        var hit: String? = null
+                        var hitCenter = Offset.Zero
+                        g.players.forEachIndexed { j, p ->
+                            if (p.id == player.id) return@forEachIndexed
+                            val oc = g.centers[j] ?: return@forEachIndexed
+                            val dx = finger.x - oc.x
+                            val dy = finger.y - oc.y
+                            val radius = (myBox + g.boxes.getOrElse(j) { 0f }) * 0.35f
+                            if (dx * dx + dy * dy < radius * radius) {
+                                if (p.id == coolPartner && now < coolUntil) return@forEachIndexed
+                                hit = p.id
+                                hitCenter = oc
+                                return@forEachIndexed
+                            }
+                        }
+                        if (hit != null) {
+                            onSwapPair(hit!!)
+                            // Rebase onto the new seat so the visual stays
+                            // glued to the finger instead of jumping.
+                            grab = hitCenter
+                            carry = finger - grab
+                            coolPartner = hit!!
+                            coolUntil = now + 400_000_000L
+                            feedback(15)
+                        }
+                    },
+                    onDragEnd = {
+                        if (!owned) return@detectDragGesturesAfterLongPress
+                        owned = false
+                        carry = Offset.Zero
+                        onSwapEnd()
+                    },
+                    onDragCancel = {
+                        if (!owned) return@detectDragGesturesAfterLongPress
+                        owned = false
+                        carry = Offset.Zero
+                        onSwapEnd()
+                    },
+                )
+            }
             .rotate(RotationUtils.degrees(player.rotation))
+            .border(
+                width = 2.dp,
+                color = if (isDragged) color else Color.Transparent,
+                shape = RoundedCornerShape(12.dp),
+            )
+            .graphicsLayer {
+                // Both branches assigned: graphicsLayer properties persist
+                // across invocations, so the lifted look would otherwise
+                // stick after the drop.
+                if (isDragged) {
+                    scaleX = 1.06f
+                    scaleY = 1.06f
+                    shadowElevation = 24f
+                } else {
+                    scaleX = 1f
+                    scaleY = 1f
+                    shadowElevation = 0f
+                }
+            }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
