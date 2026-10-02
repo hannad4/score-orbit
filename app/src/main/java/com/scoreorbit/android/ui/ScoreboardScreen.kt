@@ -117,6 +117,7 @@ private data class BoardGeo(
     val dots: DoubleArray,
     val centers: Array<Offset?>,
     val boxes: FloatArray,
+    val zones: List<Zone>,
 )
 
 /**
@@ -130,6 +131,11 @@ private class SeatDragState {
     var draggedId by mutableStateOf<String?>(null)
         private set
     var finger by mutableStateOf(Offset.Zero)
+        private set
+    /** Foreign zone armed for a team join on drop, with its team (null = solos). */
+    var dropArmed by mutableStateOf(false)
+        private set
+    var dropTeamId: String? by mutableStateOf<String?>(null)
         private set
     private var grab = Offset.Zero
     private var coolPartner = ""
@@ -145,10 +151,17 @@ private class SeatDragState {
         finger = at
         grab = at
         coolPartner = ""
+        dropArmed = false
+        dropTeamId = null
         return true
     }
 
-    /** Advance the finger, live-swapping past whoever it crosses. */
+    /**
+     * Advance the finger. Inside a foreign zone it arms a team join for
+     * the drop (no seat trading there); inside the dragged player's own
+     * zone, teammates trade seats live. Solo games have one zone, so
+     * everything trades as before.
+     */
     fun move(
         amount: Offset,
         geo: BoardGeo,
@@ -157,12 +170,24 @@ private class SeatDragState {
     ) {
         val dragged = draggedId ?: return
         finger += amount
+        val me = geo.players.firstOrNull { it.id == dragged } ?: return
+        val zone = geo.zones.firstOrNull { z ->
+            finger.x in z.rect.l..z.rect.r && finger.y in z.rect.t..z.rect.b
+        }
+        if (zone != null && zone.team?.id != me.teamId) {
+            if (!dropArmed || dropTeamId != zone.team?.id) onTick()
+            dropArmed = true
+            dropTeamId = zone.team?.id
+            return
+        }
+        dropArmed = false
+        dropTeamId = null
         val idx = geo.players.indexOfFirst { it.id == dragged }
         if (idx < 0) return
         val myBox = geo.boxes.getOrElse(idx) { 0f }
         val now = System.nanoTime()
         geo.players.forEachIndexed { j, p ->
-            if (p.id == dragged) return@forEachIndexed
+            if (p.id == dragged || p.teamId != me.teamId) return@forEachIndexed
             val oc = geo.centers[j] ?: return@forEachIndexed
             val dx = finger.x - oc.x
             val dy = finger.y - oc.y
@@ -183,6 +208,8 @@ private class SeatDragState {
 
     fun release() {
         draggedId = null
+        dropArmed = false
+        dropTeamId = null
     }
 }
 
@@ -936,9 +963,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             // Geometry handle for the seat-swap trackers. Updated every
             // composition, read fresh on every touch event through the
             // stable object (the conditional write converges immediately).
-            val boardGeoState = remember { mutableStateOf(BoardGeo(game.players, dotAngles, labelPositions, memberBoxPx)) }
-            val freshGeo = remember(game.players, dotAngles, labelPositions, memberBoxPx) {
-                BoardGeo(game.players, dotAngles, labelPositions, memberBoxPx)
+            val boardGeoState = remember { mutableStateOf(BoardGeo(game.players, dotAngles, labelPositions, memberBoxPx, zones)) }
+            val freshGeo = remember(game.players, dotAngles, labelPositions, memberBoxPx, zones) {
+                BoardGeo(game.players, dotAngles, labelPositions, memberBoxPx, zones)
             }
             if (boardGeoState.value !== freshGeo) boardGeoState.value = freshGeo
 
@@ -1271,9 +1298,16 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                     viewModel.swapPlayers(player.id, target)
                                 },
                                 onSwapEnd = {
-                                    // Drop everything here, not just in the
-                                    // board teardown: whichever runs first
-                                    // fully recovers, the other is a no-op.
+                                    // A drop in a foreign zone moves teams
+                                    // (null = going solo); otherwise live
+                                    // swaps already applied. Whichever
+                                    // teardown runs first fully recovers,
+                                    // the other is a no-op.
+                                    val dropped = seatDrag.draggedId
+                                    if (seatDrag.dropArmed && dropped != null) {
+                                        viewModel.assignPlayer(dropped, seatDrag.dropTeamId)
+                                    }
+                                    seatDrag.release()
                                     swapEngaged = false
                                     swapEndTime = System.nanoTime()
                                 },
@@ -1305,11 +1339,19 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         ) {
                             val team = zone.team
                             if (team != null) {
+                                // The armed drop zone glows stronger so the
+                                // pending team join reads at a glance.
+                                val targeted = seatDrag.dropArmed &&
+                                    zone.team?.id == seatDrag.dropTeamId
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .clip(RoundedCornerShape(24.dp))
-                                        .background(Color(team.color).copy(alpha = 0.08f)),
+                                        .background(
+                                            Color(team.color).copy(
+                                                alpha = if (targeted) 0.22f else 0.08f
+                                            )
+                                        ),
                                 )
                                 TeamTotalChip(
                                     team = team,
@@ -1317,6 +1359,19 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                     modifier = Modifier
                                         .align(zone.corner)
                                         .padding(12.dp),
+                                )
+                            } else if (seatDrag.dropArmed && seatDrag.dropTeamId == null) {
+                                // Solo zone lights up when a drop would free
+                                // the carried player from their team.
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(24.dp))
+                                        .background(
+                                            MaterialTheme.colorScheme.surfaceContainer.copy(
+                                                alpha = 0.35f
+                                            )
+                                        ),
                                 )
                             }
                             zone.members.forEach { m ->
@@ -1351,10 +1406,17 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                             viewModel.swapPlayers(player.id, target)
                                         },
                                         onSwapEnd = {
-                                            // Drop everything here, not just
-                                            // in the board teardown: whichever
-                                            // runs first fully recovers, the
-                                            // other is a no-op.
+                                            // A drop in a foreign zone moves
+                                            // teams (null = going solo);
+                                            // otherwise live swaps already
+                                            // applied. Whichever teardown runs
+                                            // first fully recovers, the other
+                                            // is a no-op.
+                                            val dropped = seatDrag.draggedId
+                                            if (seatDrag.dropArmed && dropped != null) {
+                                                viewModel.assignPlayer(dropped, seatDrag.dropTeamId)
+                                            }
+                                            seatDrag.release()
                                             swapEngaged = false
                                             swapEndTime = System.nanoTime()
                                         },
@@ -1842,12 +1904,12 @@ private fun SeatScore(
                     },
                     onDragEnd = {
                         if (drag.draggedId != player.id) return@detectDragGesturesAfterLongPress
-                        drag.release()
+                        // Resolution (team join, release, timestamps) lives
+                        // in onSwapEnd so drop state is read before clearing.
                         onSwapEnd()
                     },
                     onDragCancel = {
                         if (drag.draggedId != player.id) return@detectDragGesturesAfterLongPress
-                        drag.release()
                         onSwapEnd()
                     },
                 )

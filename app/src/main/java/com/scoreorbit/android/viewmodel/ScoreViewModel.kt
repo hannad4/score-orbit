@@ -247,6 +247,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         val game = _currentGame.value ?: return
         val target = count.coerceIn(1, 12)
         if (target == game.players.size) return
+        val oldIds = game.players.map { it.id }.toSet()
         val players = (0 until target).map { i ->
             game.players.getOrElse(i) {
                 Player(
@@ -256,9 +257,22 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
-        val ids = players.map { it.id }.toSet()
+        // Fresh faces join the smallest team (random among ties) so the
+        // split stays even without reshuffling everybody.
+        val counts = players.groupingBy { it.teamId }.eachCount().toMutableMap()
+        val filled = players.map { p ->
+            if (p.id in oldIds || game.teams.isEmpty()) {
+                p
+            } else {
+                val smallest = game.teams.map { it.id }.shuffled()
+                    .minByOrNull { counts.getOrDefault(it, 0) }!!
+                counts[smallest] = counts.getOrDefault(smallest, 0) + 1
+                p.copy(teamId = smallest)
+            }
+        }
+        val ids = filled.map { it.id }.toSet()
         _currentGame.value = game.copy(
-            players = players,
+            players = filled,
             entries = game.entries.filter { it.playerId in ids },
         ).pruned()
         undoStack.clear()
@@ -332,20 +346,6 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     // non-empty team (plus solos, if any) its own zone; anything beyond
     // that shares the last zone instead of breaking the layout.
 
-    fun createTeam(name: String): String? {
-        val game = _currentGame.value ?: return null
-        if (game.teams.size >= 4) return null
-        val used = game.players.map { it.color } + game.teams.map { it.color }
-        val team = Team(
-            id = UUID.randomUUID().toString(),
-            name = name.ifBlank { "Team ${game.teams.size + 1}" },
-            color = nextFreeColor(used, game.teams.size),
-        )
-        _currentGame.value = game.copy(teams = game.teams + team)
-        persist()
-        return team.id
-    }
-
     fun renameTeam(teamId: String, name: String) {
         val game = _currentGame.value ?: return
         _currentGame.value = game.copy(
@@ -389,27 +389,33 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Team count stepper behind the Players settings. Growing adds named
-     * teams; shrinking drops from the end and frees their players — scores
-     * stay with whoever earned them.
+     * teams, shrinking drops from the end — then everybody is dealt back
+     * out randomly and as evenly as possible (round-robin over a shuffle),
+     * so the count always means a fresh even split. Shrunk-away members
+     * rejoin the deal with their scores intact.
      */
     fun setTeamCount(count: Int) {
         val game = _currentGame.value ?: return
         val target = count.coerceIn(0, 4)
         if (target == game.teams.size) return
-        if (target > game.teams.size) {
+        val teams = if (target > game.teams.size) {
             val used = (game.players.map { it.color } + game.teams.map { it.color }).toMutableList()
-            val fresh = (game.teams.size until target).map { i ->
+            game.teams + (game.teams.size until target).map { i ->
                 Team(name = "Team ${i + 1}", color = nextFreeColor(used, i))
                     .also { used.add(it.color) }
             }
-            _currentGame.value = game.copy(teams = game.teams + fresh)
         } else {
-            val doomed = game.teams.drop(target).map { it.id }.toSet()
-            _currentGame.value = game.copy(
-                teams = game.teams.take(target),
-                players = game.players.map { if (it.teamId in doomed) it.copy(teamId = null) else it },
-            )
+            game.teams.take(target)
         }
+        val teamIds = teams.map { it.id }
+        val dealt = if (teamIds.isEmpty()) {
+            game.players.map { it.copy(teamId = null) }
+        } else {
+            val order = game.players.map { it.id }.shuffled()
+            val table = order.mapIndexed { i, pid -> pid to teamIds[i % teamIds.size] }.toMap()
+            game.players.map { it.copy(teamId = table[it.id]) }
+        }
+        _currentGame.value = game.copy(teams = teams, players = dealt)
         persist()
     }
 

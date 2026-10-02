@@ -53,7 +53,6 @@ import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -67,7 +66,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumTopAppBar
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -102,9 +100,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
@@ -636,8 +631,6 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
     latestGame = game
     var paletteFor by remember { mutableStateOf<Player?>(null) }
     var teamPaletteFor by remember { mutableStateOf<Team?>(null) }
-    var assignFor by remember { mutableStateOf<Player?>(null) }
-    var showNewTeam by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     // Long-press-drag reorder state. The dragged card follows the finger via
     // graphicsLayer (placement untouched); neighbors swap live underneath.
@@ -700,7 +693,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    if (teamMode) "Drag the handle to reorder \u2022 tap Solo to join a team"
+                    if (teamMode) "Drag the handle to reorder \u2022 drag scores between zones on the board to change teams"
                     else "Drag the handle to reorder",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -721,21 +714,11 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
             // Hidden entirely in Individual mode.
             if (teamMode) {
                 item {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    Text(
+                        "Teams",
+                        style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            "Teams",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (game.teams.size < 4) {
-                            TextButton(onClick = { showNewTeam = true }) {
-                                Text("New team")
-                            }
-                        }
-                    }
+                    )
                 }
                 items(game.teams, key = { it.id }) { team ->
                     val members = game.players.filter { p -> p.teamId == team.id }
@@ -782,17 +765,15 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                 }
             }
             items(game.players, key = { it.id }) { player ->
-                val team = game.teams.firstOrNull { t -> t.id == player.teamId }
-                val isDragged = draggedId == player.id
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer
                     ),
                     modifier = Modifier
                         .onSizeChanged { if (cardHeightPx == 0) cardHeightPx = it.height }
-                        .zIndex(if (isDragged) 1f else 0f)
+                        .zIndex(if (draggedId == player.id) 1f else 0f)
                         .graphicsLayer {
-                            if (isDragged) {
+                            if (draggedId == player.id) {
                                 translationY = dragOffsetY
                                 scaleX = 1.03f
                                 scaleY = 1.03f
@@ -860,25 +841,6 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                             onRename = { viewModel.renamePlayer(player.id, it) },
                             modifier = Modifier.weight(1f),
                         )
-                        if (teamMode) {
-                            AssistChip(
-                                onClick = { assignFor = player },
-                                label = { Text(team?.name ?: "Solo") },
-                                leadingIcon = {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(12.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                Color(
-                                                    team?.color
-                                                        ?: ScoreOrbitColors.PlayerColors[0]
-                                                )
-                                            ),
-                                    )
-                                },
-                            )
-                        }
                         if (game.players.size > 1) {
                             IconButton(
                                 onClick = { viewModel.removePlayer(player.id) },
@@ -930,36 +892,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
             onDismiss = { teamPaletteFor = null },
         )
     }
-    assignFor?.let { player ->
-        AssignTeamDialog(
-            playerName = player.name,
-            currentTeamId = player.teamId,
-            teams = game.teams,
-            onConfirm = { pick, newName ->
-                if (pick == NEW_TEAM_ID) {
-                    val id = viewModel.createTeam(newName)
-                    if (id != null) viewModel.assignPlayer(player.id, id)
-                } else {
-                    viewModel.assignPlayer(player.id, pick)
-                }
-                assignFor = null
-            },
-            onDismiss = { assignFor = null },
-        )
-    }
-    if (showNewTeam) {
-        NewTeamDialog(
-            onConfirm = {
-                viewModel.createTeam(it)
-                showNewTeam = false
-            },
-            onDismiss = { showNewTeam = false },
-        )
-    }
 }
-
-/** Tint shown for solos in the team chip when they belong to no team. */
-private const val NEW_TEAM_ID = "__new__"
 
 /** Color dot that opens the palette dialog. Shared by player and team rows. */
 @Composable
@@ -1061,131 +994,6 @@ private fun RosterNameField(
     )
 }
 
-/** Pick Solo, an existing team, or name a new one. */
-@Composable
-private fun AssignTeamDialog(
-    playerName: String,
-    currentTeamId: String?,
-    teams: List<Team>,
-    onConfirm: (pick: String?, newName: String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var pick by remember(playerName) { mutableStateOf<String?>(currentTeamId) }
-    var newName by remember(playerName) { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(playerName) },
-        text = {
-            Column {
-                TeamPickRow(selected = pick == null, onPick = { pick = null }, label = "Solo") {
-                    Text("Solo")
-                }
-                teams.forEach { team ->
-                    TeamPickRow(
-                        selected = pick == team.id,
-                        onPick = { pick = team.id },
-                        label = team.name,
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(14.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(team.color)),
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(team.name)
-                        }
-                    }
-                }
-                TeamPickRow(
-                    selected = pick == NEW_TEAM_ID,
-                    onPick = { pick = NEW_TEAM_ID },
-                    label = "New team",
-                ) {
-                    Text("New team")
-                }
-                if (pick == NEW_TEAM_ID) {
-                    OutlinedTextField(
-                        value = newName,
-                        onValueChange = { newName = it },
-                        singleLine = true,
-                        label = { Text("Team name") },
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Words,
-                            keyboardType = KeyboardType.Text,
-                            imeAction = ImeAction.Done,
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(pick, newName) }) { Text("Done") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-    )
-}
-
-@Composable
-private fun TeamPickRow(
-    selected: Boolean,
-    onPick: () -> Unit,
-    label: String,
-    content: @Composable () -> Unit,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                onClick = onPick,
-                role = Role.RadioButton,
-            )
-            .padding(vertical = 8.dp),
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Spacer(modifier = Modifier.width(8.dp))
-        Box(modifier = Modifier.semantics { contentDescription = label }) {
-            content()
-        }
-    }
-}
-
-/** Name-only dialog behind the Teams "New team" button. */
-@Composable
-private fun NewTeamDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
-    var name by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("New team") },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                singleLine = true,
-                label = { Text("Team name") },
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words,
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Done,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(name) }) { Text("Create") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-    )
-}
 
 /** Small ring with the players' dots, previewing the tabletop board. */
 @Composable
