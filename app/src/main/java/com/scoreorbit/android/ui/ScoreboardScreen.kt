@@ -15,6 +15,7 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -60,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -390,7 +392,13 @@ private fun computeZones(
     val gapPx = with(density) { 12.dp.toPx() }
     val insetPx = with(density) { 4.dp.toPx() }
     return groups.mapIndexed { zi, (team, memberIdx) ->
-        val rect = when (zi) {
+        // Two groups split the board into top/bottom halves, first group
+        // on top; three or four fall back to quadrants.
+        val halves = groups.size == 2
+        val rect = if (halves) {
+            if (zi == 0) ZoneRect(insetPx, insetPx, wPx - insetPx, hPx / 2f - insetPx)
+            else ZoneRect(insetPx, hPx / 2f + insetPx, wPx - insetPx, hPx - insetPx)
+        } else when (zi) {
                 0 -> ZoneRect(insetPx, insetPx, wPx / 2f - insetPx, hPx / 2f - insetPx)
                 1 -> ZoneRect(wPx / 2f + insetPx, insetPx, wPx - insetPx, hPx / 2f - insetPx)
                 2 -> ZoneRect(insetPx, hPx / 2f + insetPx, wPx / 2f - insetPx, hPx - insetPx)
@@ -448,7 +456,16 @@ private fun computeZones(
                 )
                 ZoneMember(pi, Offset(pushed.x - rect.l, pushed.y - rect.t), box)
             }
-            Zone(rect, team, corners[zi], members)
+            Zone(
+                rect,
+                team,
+                if (halves) {
+                    if (zi == 0) Alignment.TopStart else Alignment.BottomStart
+                } else {
+                    corners[zi]
+                },
+                members,
+            )
         }
 }
 
@@ -1081,6 +1098,33 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         )
                     }
             ) {
+                // Team zones, pass one: tinted backgrounds (dial cut out)
+                // plus total chips — everything below the ring, dots and
+                // labels, which render in the existing loops further down.
+                if (zoned) {
+                    zones.forEach { zone ->
+                        Box(
+                            modifier = Modifier
+                                .offset { IntOffset(zone.rect.l.toInt(), zone.rect.t.toInt()) }
+                                .size(
+                                    with(density) { (zone.rect.r - zone.rect.l).toDp() },
+                                    with(density) { (zone.rect.b - zone.rect.t).toDp() },
+                                )
+                        ) {
+                            ZoneBackdrop(
+                                zone = zone,
+                                ringR = ringR,
+                                dotD = dotD,
+                                cx = cx,
+                                cy = cy,
+                                density = density,
+                                targeted = seatDrag.dropArmed &&
+                                    zone.team?.id == seatDrag.dropTeamId,
+                                total = teamTotals[zone.team?.id] ?: 0,
+                            )
+                        }
+                    }
+                }
                 // Track ring + swipe arc (bounded canvas: cheap frames).
                 RingDial(
                     cxPx = cx,
@@ -1325,9 +1369,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         }
                     }
                 } else {
-                    // Team zones: tinted quadrant, total chip in the outer
-                    // corner, member labels in a fitted grid. Chips are
-                    // display only, so dial gestures pass straight through.
+                    // Team zones, pass two: member labels in a fitted grid.
+                    // (Tints and total chips rendered in the pass above the
+                    // ring, so the dial always draws over them.)
                     zones.forEach { zone ->
                         Box(
                             modifier = Modifier
@@ -1337,43 +1381,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                     with(density) { (zone.rect.b - zone.rect.t).toDp() },
                                 )
                         ) {
-                            val team = zone.team
-                            if (team != null) {
-                                // The armed drop zone glows stronger so the
-                                // pending team join reads at a glance.
-                                val targeted = seatDrag.dropArmed &&
-                                    zone.team?.id == seatDrag.dropTeamId
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(24.dp))
-                                        .background(
-                                            Color(team.color).copy(
-                                                alpha = if (targeted) 0.22f else 0.08f
-                                            )
-                                        ),
-                                )
-                                TeamTotalChip(
-                                    team = team,
-                                    total = teamTotals[team.id] ?: 0,
-                                    modifier = Modifier
-                                        .align(zone.corner)
-                                        .padding(12.dp),
-                                )
-                            } else if (seatDrag.dropArmed && seatDrag.dropTeamId == null) {
-                                // Solo zone lights up when a drop would free
-                                // the carried player from their team.
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(24.dp))
-                                        .background(
-                                            MaterialTheme.colorScheme.surfaceContainer.copy(
-                                                alpha = 0.35f
-                                            )
-                                        ),
-                                )
-                            }
                             zone.members.forEach { m ->
                                 val player = game.players[m.playerIndex]
                                 val off = IntOffset(
@@ -1748,6 +1755,61 @@ private fun ConfettiOverlay(colors: List<Color>, modifier: Modifier = Modifier) 
                 )
             }
         }
+    }
+}
+
+/**
+ * Zone background + total chip, rendered underneath the ring, dots and
+ * labels. The tint is cut around the dial by painting the board
+ * background back over it — a plain overpaint, so it renders identically
+ * everywhere. Chips are display only and never consume touches.
+ */
+@Composable
+private fun BoxScope.ZoneBackdrop(
+    zone: Zone,
+    ringR: Float,
+    dotD: Float,
+    cx: Float,
+    cy: Float,
+    density: Density,
+    targeted: Boolean,
+    total: Int,
+) {
+    val team = zone.team
+    val d = LocalDensity.current
+    if (team != null) {
+        val tintColor = Color(team.color)
+        val tintAlpha = if (targeted) 0.22f else 0.08f
+        val boardBg = MaterialTheme.colorScheme.background
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawRoundRect(
+                color = tintColor.copy(alpha = tintAlpha),
+                cornerRadius = CornerRadius(with(d) { 24.dp.toPx() }),
+            )
+                                    drawCircle(
+                                        color = boardBg,
+                                        radius = ringR + dotD * 0.75f + with(d) { 12.dp.toPx() },
+                                        center = Offset(cx - zone.rect.l, cy - zone.rect.t),
+                                    )
+        }
+        TeamTotalChip(
+            team = team,
+            total = total,
+            modifier = Modifier
+                .align(zone.corner)
+                .padding(12.dp),
+        )
+    } else if (targeted) {
+        // Solo zone lights up when a drop would free the carried player
+        // from their team.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(24.dp))
+                .background(
+                    MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.35f)
+                ),
+        )
     }
 }
 

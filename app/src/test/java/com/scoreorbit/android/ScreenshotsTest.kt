@@ -154,6 +154,44 @@ class ScreenshotsTest {
         }
     }
 
+    private fun demoTwoTeamGame(): Game {
+        val colors = ScoreOrbitColors.PlayerColors
+        val teams = listOf(
+            Team(id = "t1", name = "Red", color = colors[7]),
+            Team(id = "t2", name = "Blue", color = colors[9]),
+        )
+        val players = listOf(
+            Player(id = "p1", name = "Joey", color = colors[4], teamId = "t1"),
+            Player(id = "p2", name = "Stu", color = colors[2], teamId = "t1"),
+            Player(id = "p3", name = "Tomas", color = colors[0], teamId = "t2"),
+            Player(id = "p4", name = "Sofia", color = colors[1], teamId = "t2"),
+        )
+        val entries = listOf(
+            ScoreEntry(id = "e1", playerId = "p1", delta = 30),
+            ScoreEntry(id = "e2", playerId = "p2", delta = 45),
+            ScoreEntry(id = "e3", playerId = "p3", delta = 37),
+            ScoreEntry(id = "e4", playerId = "p4", delta = 18),
+        )
+        return Game(
+            name = "Game Night",
+            players = players,
+            teams = teams,
+            rotationPoints = 10,
+            tapPoints = 1,
+            entries = entries,
+        )
+    }
+
+    @Test
+    fun twoTeamBoard() {
+        val game = demoTwoTeamGame()
+        paparazzi.snapshot {
+            ScoreOrbitTheme(dynamicColor = false) {
+                ScoreboardScreen(game = game, viewModel = stubViewModel())
+            }
+        }
+    }
+
     @Test
     fun teamsLeaderboard() {
         val game = demoTeamsGame()

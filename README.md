@@ -25,7 +25,7 @@ Scores land in a running ledger with undo and redo, so mis-taps are one button p
 ## Details worth knowing
 
 - **Tabletop-first layout.** Scores sit outside the ring facing each player's seat, and each dial dot parks near its corresponding player. The board dynamically adapts, comfortably accommodating anywhere between 1 and 12 players.
-- **Teams.** Pick a team count and players are dealt out randomly and evenly; drag a score into another quadrant on the board to move them between teams. Each quadrant shows its collective total, while everyone still scores individually.
+- **Teams.** Pick a team count and players are dealt out randomly and evenly; drag a score into another area on the board to move them between teams. Two teams split the board top and bottom (more teams get quadrants), each area showing its collective total, while everyone still scores individually.
 - **Race to a target.** Set a Score to Win and the game ends in confetti the moment someone gets there — or leave it blank and play endless.
 - **Gesture-safe board.** The bottom strip of the board ignores touches, so a swipe up to the home screen never changes the score by accident.
 - **Never loses your game.** Setup, scores, and undo history save on every change and restore on launch - move the app to the background or come back tomorrow and the board is exactly as you left it.
