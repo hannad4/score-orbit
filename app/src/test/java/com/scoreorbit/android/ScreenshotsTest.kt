@@ -240,4 +240,44 @@ class ScreenshotsTest {
         }
     }
 
+    private fun demoFullGame(): Game {
+        val colors = ScoreOrbitColors.PlayerColors
+        val teams = (1..4).map { t ->
+            Team(id = "t$t", name = "Team $t", color = colors[(t * 3) % colors.size])
+        }
+        val names = listOf(
+            "Joey", "Stu", "Tomas", "Sofia", "Ana", "Ben",
+            "Cleo", "Dan", "Eli", "Fay", "Gus", "Hal",
+        )
+        val players = names.mapIndexed { i, name ->
+            Player(
+                id = "p${i + 1}",
+                name = name,
+                color = colors[i % colors.size],
+                teamId = "t${i / 3 + 1}",
+            )
+        }
+        val entries = players.mapIndexed { i, p ->
+            ScoreEntry(id = "e${i + 1}", playerId = p.id, delta = 10 + i * 5)
+        }
+        return Game(
+            name = "Game Night",
+            players = players,
+            teams = teams,
+            rotationPoints = 10,
+            tapPoints = 1,
+            entries = entries,
+        )
+    }
+
+    @Test
+    fun fullHouseBoard() {
+        val game = demoFullGame()
+        paparazzi.snapshot {
+            ScoreOrbitTheme(dynamicColor = false) {
+                ScoreboardScreen(game = game, viewModel = stubViewModel())
+            }
+        }
+    }
+
 }

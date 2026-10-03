@@ -356,6 +356,7 @@ private data class Zone(
     val team: Team?,
     val corner: Alignment,
     val members: List<ZoneMember>,
+    val compact: Boolean,
 )
 
 /**
@@ -405,16 +406,21 @@ private fun computeZones(
                 else -> ZoneRect(wPx / 2f + insetPx, hPx / 2f + insetPx, wPx - insetPx, hPx - insetPx)
             }
             val m = memberIdx.size
+            // Wide zones (halves) fill across; square ones stay compact.
+            // Three across in a single row beats a 2+1 stagger.
+            val zoneW = rect.r - rect.l
+            val zoneH = rect.b - rect.t
+            val wide = zoneW > zoneH * 1.25f
             val cols = when {
                 m <= 1 -> 1
                 m == 2 -> 2
+                wide -> min(3, m)
+                m == 3 -> 3
                 m <= 4 -> 2
                 else -> 3
             }
             val rows = (m + cols - 1) / cols
             val pitch = labelBoxPx + gapPx
-            val zoneW = rect.r - rect.l
-            val zoneH = rect.b - rect.t
             val fit = min(
                 1f,
                 min(
@@ -465,6 +471,8 @@ private fun computeZones(
                     corners[zi]
                 },
                 members,
+                // Crushed zones drop names, same as crushed bands.
+                fit < 0.75f,
             )
         }
 }
@@ -491,6 +499,16 @@ private fun pushOutsideRing(p: Offset, cx: Float, cy: Float, minDist: Float): Of
  * one). 4+ players use the player-order band grid. Pure layout math: it only
  * depends on the board geometry, never on gesture state.
  */
+/**
+ * What [computeLabelPositions] returns: label centers plus a per-label
+ * compact flag. When a band compresses hard (fit below ~3/4), names
+ * would shrink to noise — those labels show the color-coded score only.
+ */
+private data class LabelLayout(
+    val positions: Array<Offset?>,
+    val compact: BooleanArray,
+)
+
 private fun computeLabelPositions(
     n: Int,
     wPx: Float,
@@ -502,9 +520,10 @@ private fun computeLabelPositions(
     labelBoxPx: Float,
     edgeMarginPx: Float,
     density: Density,
-): Array<Offset?> {
+): LabelLayout {
     val center = Offset(cx, cy)
     val positions = arrayOfNulls<Offset>(n)
+    val compact = BooleanArray(n)
     val stackOffset = labelBoxPx + with(density) { 12.dp.toPx() }
     // Minimum breathing room between a label and the ring/dots so
     // crowded boards never read as clipped into the dial. Small boards
@@ -555,6 +574,9 @@ private fun computeLabelPositions(
                 // so P1 lands top-left; bottom band fills
                 // downward in the same reading order.
                 val rr = if (sign < 0f) rows.size - 1 - r else r
+                // Crushed bands drop names: a color-coded score stays
+                // legible long after 11sp names turn to noise.
+                val squeezed = vFit < 0.75f
                 row.forEachIndexed { c, i ->
                     val d = (nearD + rr * rowPitch + labelBoxPx / 2f) * vFit
                     positions[i] = pushOutsideRing(
@@ -562,6 +584,7 @@ private fun computeLabelPositions(
                         cx, cy,
                         ringR + dotD / 2f + labelBoxPx / 2f + with(density) { 12.dp.toPx() },
                     )
+                    compact[i] = squeezed
                 }
             }
         }
@@ -662,7 +685,7 @@ private fun computeLabelPositions(
             y = if (hiY <= loY) hPx / 2f else p.y.coerceIn(loY, hiY),
         )
     }
-    return positions
+    return LabelLayout(positions, compact)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -937,15 +960,17 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             // off their own ring-edge spot when there isn't one). 4+
             // players use the player-order band grid instead. Team games
             // read positions back out of the zone grids.
-            val labelPositions: Array<Offset?> = if (zoned) {
+            val layout: LabelLayout = if (zoned) {
                 remember(zones) {
-                    arrayOfNulls<Offset>(n).also { arr ->
-                        zones.forEach { z ->
-                            z.members.forEach { m ->
-                                arr[m.playerIndex] = Offset(z.rect.l + m.local.x, z.rect.t + m.local.y)
-                            }
+                    val arr = arrayOfNulls<Offset>(n)
+                    val comp = BooleanArray(n)
+                    zones.forEach { z ->
+                        z.members.forEach { m ->
+                            arr[m.playerIndex] = Offset(z.rect.l + m.local.x, z.rect.t + m.local.y)
+                            comp[m.playerIndex] = z.compact
                         }
                     }
+                    LabelLayout(arr, comp)
                 }
             } else {
                 remember(
@@ -954,6 +979,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     computeLabelPositions(n, wPx, layoutH, cx, cy, ringR, dotD, labelBoxPx, edgeMarginPx, density)
                 }
             }
+            val labelPositions: Array<Offset?> = layout.positions
             // Per-player label box: uniform in legacy mode, fitted per zone
             // member in team mode.
             val memberBoxPx = if (zoned) {
@@ -1320,7 +1346,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 // total; the live spin delta lives only in the center
                                 // readout while swiping, then commits on release.
                                 score = totals[player.id] ?: 0,
-                                showName = game.showPlayerNames,
+                                showName = game.showPlayerNames && !layout.compact[i],
                                 scoreSp = memberScoreSp(memberBoxPx[i]),
                                 boxDp = dp(memberBoxPx[i]),
                                 dimmed = activeId != null && !isActive,
@@ -1391,7 +1417,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                     SeatScore(
                                         player = player,
                                         score = totals[player.id] ?: 0,
-                                        showName = game.showPlayerNames,
+                                        showName = game.showPlayerNames && !zone.compact,
                                         scoreSp = memberScoreSp(m.boxPx),
                                         boxDp = dp(m.boxPx),
                                         dimmed = activeId != null && activeId != player.id,
