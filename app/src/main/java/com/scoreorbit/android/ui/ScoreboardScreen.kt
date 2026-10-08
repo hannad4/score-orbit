@@ -356,7 +356,7 @@ private data class Zone(
     val team: Team?,
     val corner: Alignment,
     val members: List<ZoneMember>,
-    val compact: Boolean,
+    val rowMode: Boolean,
 )
 
 /**
@@ -428,39 +428,66 @@ private fun computeZones(
                     (zoneH - gapPx) / (rows * pitch),
                 ),
             ).coerceAtLeast(0.4f)
-            val box = labelBoxPx * fit
-            val step = pitch * fit
-            // Grid center pushed outward from the dial so member labels
-            // clear the ring, then clamped so the fitted grid stays inside
-            // its zone.
-            val rawCx = (rect.l + rect.r) / 2f
-            val rawCy = (rect.t + rect.b) / 2f
-            val dx = rawCx - wPx / 2f
-            val dy = rawCy - hPx / 2f
-            val len = sqrt(dx * dx + dy * dy)
-            val push = min(zoneW, zoneH) * 0.18f
-            val wantCx = if (len > 0f) rawCx + dx / len * push else rawCx
-            val wantCy = if (len > 0f) rawCy + dy / len * push else rawCy
-            val hw = ((cols - 1) * step + box) / 2f
-            val hh = ((rows - 1) * step + box) / 2f
-            val gcX = if (hw * 2f >= zoneW) rawCx else wantCx.coerceIn(rect.l + hw, rect.r - hw)
-            val gcY = if (hh * 2f >= zoneH) rawCy else wantCy.coerceIn(rect.t + hh, rect.b - hh)
-            val cx = gcX - rect.l
-            val cy = gcY - rect.t
-            val members = memberIdx.mapIndexed { k, pi ->
-                val gy = k / cols
-                val rowLen = min(cols, m - gy * cols)
-                val gx = k % cols
-                val x = cx + (gx - (rowLen - 1) / 2f) * step
-                val y = cy + (gy - (rows - 1) / 2f) * step
-                // Same hard guarantee as the band grid: grid cells near the
-                // dial's inner corner get pushed back out radially.
-                val pushed = pushOutsideRing(
-                    Offset(rect.l + x, rect.t + y),
-                    wPx / 2f, hPx / 2f,
-                    ringR + dotD / 2f + box / 2f + with(density) { 12.dp.toPx() },
-                )
-                ZoneMember(pi, Offset(pushed.x - rect.l, pushed.y - rect.t), box)
+            val members: List<ZoneMember>
+            val rowMode = fit < 0.8f
+            if (rowMode) {
+                // Crushed zone: full-width short rows stacked vertically
+                // instead of shrunken squares. Names stay big and readable;
+                // the rows fill the zone instead of huddling in its middle.
+                // Each row gets the same radial ring-guard as grid cells.
+                val maxRowH = with(density) { 64.dp.toPx() }
+                val gapY = with(density) { 8.dp.toPx() }
+                val rowH = ((zoneH - gapPx) / m - gapY)
+                    .coerceIn(with(density) { 40.dp.toPx() }, maxRowH)
+                val totalH = m * rowH + (m - 1) * gapY
+                var y = (rect.t + rect.b) / 2f - totalH / 2f + rowH / 2f
+                val rowCx = (rect.l + rect.r) / 2f
+                members = memberIdx.map { pi ->
+                    val rawY = y
+                    y += rowH + gapY
+                    val pushed = pushOutsideRing(
+                        Offset(rowCx, rawY),
+                        wPx / 2f, hPx / 2f,
+                        ringR + rowH / 2f + with(density) { 12.dp.toPx() },
+                    )
+                    val cyRow = pushed.y.coerceIn(rect.t + rowH / 2f, rect.b - rowH / 2f)
+                    ZoneMember(pi, Offset(rowCx - rect.l, cyRow - rect.t), rowH)
+                }
+            } else {
+                val box = labelBoxPx * fit
+                val step = pitch * fit
+                // Grid center pushed outward from the dial so member labels
+                // clear the ring, then clamped so the fitted grid stays inside
+                // its zone.
+                val rawCx = (rect.l + rect.r) / 2f
+                val rawCy = (rect.t + rect.b) / 2f
+                val dx = rawCx - wPx / 2f
+                val dy = rawCy - hPx / 2f
+                val len = sqrt(dx * dx + dy * dy)
+                val push = min(zoneW, zoneH) * 0.18f
+                val wantCx = if (len > 0f) rawCx + dx / len * push else rawCx
+                val wantCy = if (len > 0f) rawCy + dy / len * push else rawCy
+                val hw = ((cols - 1) * step + box) / 2f
+                val hh = ((rows - 1) * step + box) / 2f
+                val gcX = if (hw * 2f >= zoneW) rawCx else wantCx.coerceIn(rect.l + hw, rect.r - hw)
+                val gcY = if (hh * 2f >= zoneH) rawCy else wantCy.coerceIn(rect.t + hh, rect.b - hh)
+                val cx = gcX - rect.l
+                val cy = gcY - rect.t
+                members = memberIdx.mapIndexed { k, pi ->
+                    val gy = k / cols
+                    val rowLen = min(cols, m - gy * cols)
+                    val gx = k % cols
+                    val x = cx + (gx - (rowLen - 1) / 2f) * step
+                    val y = cy + (gy - (rows - 1) / 2f) * step
+                    // Same hard guarantee as the band grid: grid cells near the
+                    // dial's inner corner get pushed back out radially.
+                    val pushed = pushOutsideRing(
+                        Offset(rect.l + x, rect.t + y),
+                        wPx / 2f, hPx / 2f,
+                        ringR + dotD / 2f + box / 2f + with(density) { 12.dp.toPx() },
+                    )
+                    ZoneMember(pi, Offset(pushed.x - rect.l, pushed.y - rect.t), box)
+                }
             }
             Zone(
                 rect,
@@ -471,8 +498,7 @@ private fun computeZones(
                     corners[zi]
                 },
                 members,
-                // Crushed zones drop names, same as crushed bands.
-                fit < 0.75f,
+                rowMode,
             )
         }
 }
@@ -499,16 +525,6 @@ private fun pushOutsideRing(p: Offset, cx: Float, cy: Float, minDist: Float): Of
  * one). 4+ players use the player-order band grid. Pure layout math: it only
  * depends on the board geometry, never on gesture state.
  */
-/**
- * What [computeLabelPositions] returns: label centers plus a per-label
- * compact flag. When a band compresses hard (fit below ~3/4), names
- * would shrink to noise — those labels show the color-coded score only.
- */
-private data class LabelLayout(
-    val positions: Array<Offset?>,
-    val compact: BooleanArray,
-)
-
 private fun computeLabelPositions(
     n: Int,
     wPx: Float,
@@ -520,10 +536,9 @@ private fun computeLabelPositions(
     labelBoxPx: Float,
     edgeMarginPx: Float,
     density: Density,
-): LabelLayout {
+): Array<Offset?> {
     val center = Offset(cx, cy)
     val positions = arrayOfNulls<Offset>(n)
-    val compact = BooleanArray(n)
     val stackOffset = labelBoxPx + with(density) { 12.dp.toPx() }
     // Minimum breathing room between a label and the ring/dots so
     // crowded boards never read as clipped into the dial. Small boards
@@ -574,9 +589,6 @@ private fun computeLabelPositions(
                 // so P1 lands top-left; bottom band fills
                 // downward in the same reading order.
                 val rr = if (sign < 0f) rows.size - 1 - r else r
-                // Crushed bands drop names: a color-coded score stays
-                // legible long after 11sp names turn to noise.
-                val squeezed = vFit < 0.75f
                 row.forEachIndexed { c, i ->
                     val d = (nearD + rr * rowPitch + labelBoxPx / 2f) * vFit
                     positions[i] = pushOutsideRing(
@@ -584,7 +596,6 @@ private fun computeLabelPositions(
                         cx, cy,
                         ringR + dotD / 2f + labelBoxPx / 2f + with(density) { 12.dp.toPx() },
                     )
-                    compact[i] = squeezed
                 }
             }
         }
@@ -685,7 +696,7 @@ private fun computeLabelPositions(
             y = if (hiY <= loY) hPx / 2f else p.y.coerceIn(loY, hiY),
         )
     }
-    return LabelLayout(positions, compact)
+    return positions
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -960,17 +971,15 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             // off their own ring-edge spot when there isn't one). 4+
             // players use the player-order band grid instead. Team games
             // read positions back out of the zone grids.
-            val layout: LabelLayout = if (zoned) {
+            val labelPositions: Array<Offset?> = if (zoned) {
                 remember(zones) {
-                    val arr = arrayOfNulls<Offset>(n)
-                    val comp = BooleanArray(n)
-                    zones.forEach { z ->
-                        z.members.forEach { m ->
-                            arr[m.playerIndex] = Offset(z.rect.l + m.local.x, z.rect.t + m.local.y)
-                            comp[m.playerIndex] = z.compact
+                    arrayOfNulls<Offset>(n).also { arr ->
+                        zones.forEach { z ->
+                            z.members.forEach { m ->
+                                arr[m.playerIndex] = Offset(z.rect.l + m.local.x, z.rect.t + m.local.y)
+                            }
                         }
                     }
-                    LabelLayout(arr, comp)
                 }
             } else {
                 remember(
@@ -979,7 +988,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     computeLabelPositions(n, wPx, layoutH, cx, cy, ringR, dotD, labelBoxPx, edgeMarginPx, density)
                 }
             }
-            val labelPositions: Array<Offset?> = layout.positions
             // Per-player label box: uniform in legacy mode, fitted per zone
             // member in team mode.
             val memberBoxPx = if (zoned) {
@@ -1346,7 +1354,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 // total; the live spin delta lives only in the center
                                 // readout while swiping, then commits on release.
                                 score = totals[player.id] ?: 0,
-                                showName = game.showPlayerNames && !layout.compact[i],
+                                showName = game.showPlayerNames,
                                 scoreSp = memberScoreSp(memberBoxPx[i]),
                                 boxDp = dp(memberBoxPx[i]),
                                 dimmed = activeId != null && !isActive,
@@ -1417,7 +1425,8 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                     SeatScore(
                                         player = player,
                                         score = totals[player.id] ?: 0,
-                                        showName = game.showPlayerNames && !zone.compact,
+                                        showName = game.showPlayerNames,
+                                        compact = zone.rowMode,
                                         scoreSp = memberScoreSp(m.boxPx),
                                         boxDp = dp(m.boxPx),
                                         dimmed = activeId != null && activeId != player.id,
@@ -1927,6 +1936,10 @@ private fun SeatScore(
     onSwapPair: (String) -> Unit,
     onSwapEnd: () -> Unit,
     glideBase: Boolean = true,
+    // Compact rows (packed zones): full-width strips with name + score
+    // side by side instead of small squares. Still draggable; tap and
+    // rotation are dropped (a wide strip can't turn inside its bounds).
+    compact: Boolean = false,
 ) {
     val color = Color(player.color)
     // Count up/down to the new total instead of jumping to it. At rest the
@@ -1958,12 +1971,19 @@ private fun SeatScore(
         label = "seatSlide",
     )
     val glidingBase = if (glideBase) animatedBase else offsetPx
+    // Compact rows span the zone width; square labels keep their box.
+    // The drag offset applies in both (carry tracks the finger either
+    // way); layout x is centered for rows.
+    val placeX = if (compact) 0 else glidingBase.x
     Box(
         modifier = Modifier
             .offset {
-                glidingBase + IntOffset(carry.x.roundToInt(), carry.y.roundToInt())
+                IntOffset(
+                    (placeX + carry.x).roundToInt(),
+                    (glidingBase.y + carry.y).toInt(),
+                )
             }
-            .size(boxDp)
+            .then(if (compact) Modifier.fillMaxWidth().height(boxDp) else Modifier.size(boxDp))
             .alpha(if (dimmed) 0.4f else 1f)
             .pointerInput(player.id) {
                 // Deliberately stateless: all tracking lives in [drag], so
@@ -2002,7 +2022,7 @@ private fun SeatScore(
                     },
                 )
             }
-            .rotate(RotationUtils.degrees(player.rotation))
+            .rotate(if (compact) 0f else RotationUtils.degrees(player.rotation))
             .border(
                 width = 2.dp,
                 color = if (isDragged) color else Color.Transparent,
@@ -2025,11 +2045,45 @@ private fun SeatScore(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = onTap,
+                // Compact rows don't rotate (a full-width strip can't turn
+                // inside its bounds); taps there do nothing, drags work.
+                onClick = { if (!compact) onTap() },
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Compact rows read name + score side by side at full width;
+        // roomy labels keep the stacked square.
+        val nameSize = (if (compact) size * 0.62f else size * 0.36f).coerceAtLeast(12f)
+        if (compact) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+            ) {
+                if (showName) {
+                    Text(
+                        text = player.name,
+                        fontSize = nameSize.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = color,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Start,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Text(
+                    text = text,
+                    fontSize = size.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = color,
+                    maxLines = 1,
+                    textAlign = TextAlign.End,
+                )
+            }
+        } else {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
             if (showName) {
                 Text(
                     text = player.name,
@@ -2051,6 +2105,7 @@ private fun SeatScore(
                 maxLines = 1,
                 textAlign = TextAlign.Center,
             )
+            }
         }
     }
 }
