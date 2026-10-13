@@ -1844,25 +1844,16 @@ private fun podiumRanks(scores: List<Int>, lowestWins: Boolean): List<Int> {
     return scores.map { sc -> scores.count { if (lowestWins) it < sc else it > sc } + 1 }
 }
 
-/** Small trophy + "1st"/"2nd"/"3rd"; draws nothing outside the top three. */
+/** Gold/silver/bronze trophy (leaderboard colors); nothing outside the top three. */
 @Composable
-private fun RankBadge(rank: Int, color: Color, modifier: Modifier = Modifier) {
-    if (rank !in 1..3) return
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = Icons.Filled.EmojiEvents,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(12.dp),
-        )
-        Text(
-            text = when (rank) { 1 -> "1st"; 2 -> "2nd"; else -> "3rd" },
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = color,
-            maxLines = 1,
-        )
-    }
+private fun RankBadge(rank: Int, modifier: Modifier = Modifier) {
+    val medal = medalFor(rank) ?: return
+    Icon(
+        imageVector = Icons.Filled.EmojiEvents,
+        contentDescription = when (rank) { 1 -> "1st place"; 2 -> "2nd place"; else -> "3rd place" },
+        tint = medal,
+        modifier = modifier.size(20.dp),
+    )
 }
 
 /** Team name + collective total. Display only — never consumes touches. */@Composable
@@ -1891,7 +1882,6 @@ private fun TeamTotalChip(team: Team, total: Int, rank: Int, modifier: Modifier 
     }
     RankBadge(
         rank = rank,
-        color = Color(team.color),
         modifier = Modifier
             .align(Alignment.BottomEnd)
             .padding(end = 8.dp, bottom = 2.dp),
@@ -2079,15 +2069,24 @@ private fun SeatScore(
                     textAlign = TextAlign.Center,
                 )
             }
-            Text(
-                text = text,
-                fontSize = size.sp,
-                fontWeight = FontWeight.Bold,
-                color = color,
-                maxLines = 1,
-                textAlign = TextAlign.Center,
-            )
+            // Trophy hangs off the digits' bottom-right corner, not the
+            // label box's.
+            Box {
+                Text(
+                    text = text,
+                    fontSize = size.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = color,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                )
+                RankBadge(
+                    rank,
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .offset(x = 14.dp, y = (-2).dp),
+                )
+            }
         }
-        RankBadge(rank, color, Modifier.align(Alignment.BottomEnd))
     }
 }
