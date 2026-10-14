@@ -416,6 +416,9 @@ private fun layoutRowMembers(
     val yAt = { k: Int -> startY + k * (rowH + gapY) }
     // Left column takes the first half in roster order, right the rest.
     val split = (memberIdx.size + 1) / 2
+    // Breathing room from the team chip: top zones settle downward,
+    // bottom zones upward.
+    val nudge = with(density) { 4.dp.toPx() } * if (isTop) 1f else -1f
     return memberIdx.mapIndexed { k, pi ->
         // Column of this member: halves fill left column first.
         val c = if (!wide) 0 else if (k < split) 0 else 1
@@ -425,7 +428,7 @@ private fun layoutRowMembers(
         else rect.r - padX - colW
         val width = if (wide) colW else zoneW - 2f * padX
         val centerX = left + width / 2f
-        val centerY = yAt(row).coerceIn(rect.t + rowH / 2f, rect.b - rowH / 2f)
+        val centerY = (yAt(row) + nudge).coerceIn(rect.t + rowH / 2f, rect.b - rowH / 2f)
         ZoneMember(pi, Offset(centerX - rect.l, centerY - rect.t), rowH, width)
     }
 }
@@ -798,8 +801,11 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     // Restart-proof drag tracking (see SeatDragState).
     val seatDrag = remember(game.id) { SeatDragState() }
     // Seat fingerprint for the dial detector keys (order changes it,
-    // rotations don't — see the pointerInput below).
+    // rotations don't — see the pointerInput below). Team assignment is
+    // part of the print too: a team move keeps the order but re-parks
+    // every dot, so the grab map must refresh for that as well.
     val seatIds = remember(game.players) { game.players.map { it.id } }
+    val seatTeams = remember(game.players) { game.players.map { it.teamId } }
     var accRadians by remember(game.id) { mutableFloatStateOf(0f) }
     var lastAngle by remember { mutableFloatStateOf(Float.NaN) }
     // Last committed action, flashed in the middle of the ring as name +
@@ -1123,7 +1129,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     // kill the dial). Restarts only ever happen between
                     // gestures — roster changes can't occur mid-dial-spin,
                     // and swaps own their gestures.
-                    .pointerInput(game.id, seatIds, game.rotationPoints) {
+                    .pointerInput(game.id, seatIds, seatTeams, game.rotationPoints) {
                         // Per-gesture witnesses: did THIS gesture see swap
                         // activity, and what was the swap clock when it
                         // started? Combined with the latch they identify a
