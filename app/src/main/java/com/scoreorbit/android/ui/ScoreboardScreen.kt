@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -119,6 +120,10 @@ private data class BoardGeo(
     val dots: DoubleArray,
     val centers: Array<Offset?>,
     val boxes: FloatArray,
+    /** Label widths (rows are wider than tall); squares repeat [boxes]. */
+    val widths: FloatArray,
+    /** Touch slop in px for seat hit-testing. */
+    val pad: Float,
     val zones: List<Zone>,
 )
 
@@ -186,15 +191,18 @@ private class SeatDragState {
         dropTeamId = null
         val idx = geo.players.indexOfFirst { it.id == dragged }
         if (idx < 0) return
-        val myBox = geo.boxes.getOrElse(idx) { 0f }
         val now = System.nanoTime()
         geo.players.forEachIndexed { j, p ->
             if (p.id == dragged || p.teamId != me.teamId) return@forEachIndexed
             val oc = geo.centers[j] ?: return@forEachIndexed
-            val dx = finger.x - oc.x
-            val dy = finger.y - oc.y
-            val radius = (myBox + geo.boxes.getOrElse(j) { 0f }) * 0.35f
-            if (dx * dx + dy * dy < radius * radius) {
+            // Ellipse test: rows are wide and short, squares are round —
+            // one test covers both, so a finger anywhere over a label hits.
+            val rx = (geo.widths.getOrElse(idx) { 0f } + geo.widths.getOrElse(j) { 0f }) / 2f + geo.pad
+            val ry = (geo.boxes.getOrElse(idx) { 0f } + geo.boxes.getOrElse(j) { 0f }) / 2f + geo.pad
+            if (rx <= 0f || ry <= 0f) return@forEachIndexed
+            val ex = (finger.x - oc.x) / rx
+            val ey = (finger.y - oc.y) / ry
+            if (ex * ex + ey * ey < 1f) {
                 if (p.id == coolPartner && now < coolUntil) return@forEachIndexed
                 onSwap(p.id)
                 // Rebase onto the new seat so the visual stays glued to
@@ -349,7 +357,15 @@ private fun rayToEdge(center: Offset, dir: Offset, w: Float, h: Float, margin: F
  */
 private data class ZoneRect(val l: Float, val t: Float, val r: Float, val b: Float)
 
-private data class ZoneMember(val playerIndex: Int, val local: Offset, val boxPx: Float)
+private data class ZoneMember(
+    val playerIndex: Int,
+    /** Center, zone-local. */
+    val local: Offset,
+    /** Height in px (squares: edge; rows: strip height). */
+    val boxPx: Float,
+    /** Width in px (squares repeat [boxPx]; rows span wider). */
+    val rowW: Float,
+)
 
 private data class Zone(
     val rect: ZoneRect,
@@ -358,6 +374,61 @@ private data class Zone(
     val members: List<ZoneMember>,
     val rowMode: Boolean,
 )
+
+/**
+ * Row layout for packed zones: short full strips (name + score side by
+ * side) instead of shrunken squares, so names stay big and readable.
+ * Rows live only in the dial-safe band — above the ring cutout in top
+ * zones, below it in bottom ones — and stack outward from the dial.
+ * Full-width zones (halves) use two columns; side zones use one.
+ */
+private fun layoutRowMembers(
+    memberIdx: List<Int>,
+    rect: ZoneRect,
+    zoneW: Float,
+    zoneH: Float,
+    wPx: Float,
+    hPx: Float,
+    gapY: Float,
+    padX: Float,
+    chipReserve: Float,
+    wide: Boolean,
+    cutR: Float,
+    density: Density,
+): List<ZoneMember> {
+    val cxD = wPx / 2f
+    val cyD = hPx / 2f
+    val isTop = rect.b <= hPx / 2f + 1f
+    // Vertical band that clears both the dial cutout and the chip corner.
+    val bandTop = (if (isTop) rect.t + chipReserve else maxOf(rect.t, cyD + cutR))
+    val bandBot = (if (isTop) minOf(rect.b, cyD - cutR) else rect.b - chipReserve)
+    val bandH = (bandBot - bandTop).coerceAtLeast(0f)
+    // Columns: halves split left/right, side zones keep one full column.
+    val colCount = if (wide) 2 else 1
+    val colGap = if (wide) gapY * 1.5f else 0f
+    val colW = ((zoneW - 2f * padX - (colCount - 1) * colGap) / colCount).coerceAtLeast(0f)
+    val perCol = (memberIdx.size + colCount - 1) / colCount
+    val rowH = ((bandH - (perCol - 1) * gapY) / perCol.coerceAtLeast(1))
+        .coerceIn(with(density) { 36.dp.toPx() }, with(density) { 64.dp.toPx() })
+    // Evenly spread what fits; overflow (absurd counts) packs downward.
+    val totalH = perCol * rowH + (perCol - 1) * gapY
+    val startY = bandTop + ((bandH - totalH) / 2f).coerceAtLeast(0f) + rowH / 2f
+    val yAt = { k: Int -> startY + k * (rowH + gapY) }
+    // Left column takes the first half in roster order, right the rest.
+    val split = (memberIdx.size + 1) / 2
+    return memberIdx.mapIndexed { k, pi ->
+        // Column of this member: halves fill left column first.
+        val c = if (!wide) 0 else if (k < split) 0 else 1
+        val row = if (!wide) k else if (k < split) k else k - split
+        val left = if (!wide) rect.l + padX
+        else if (c == 0) rect.l + padX
+        else rect.r - padX - colW
+        val width = if (wide) colW else zoneW - 2f * padX
+        val centerX = left + width / 2f
+        val centerY = yAt(row).coerceIn(rect.t + rowH / 2f, rect.b - rowH / 2f)
+        ZoneMember(pi, Offset(centerX - rect.l, centerY - rect.t), rowH, width)
+    }
+}
 
 /**
  * Quadrant layout for team games. Non-empty teams take the quadrants in
@@ -392,6 +463,21 @@ private fun computeZones(
     val corners = listOf(Alignment.TopStart, Alignment.TopEnd, Alignment.BottomStart, Alignment.BottomEnd)
     val gapPx = with(density) { 12.dp.toPx() }
     val insetPx = with(density) { 4.dp.toPx() }
+    // A lone group owns the whole board: it gets the legacy edge layout
+    // (which already handles any count) under a full-board tint, so one
+    // team never crams into a single quadrant.
+    if (groups.size == 1) {
+        val (team, _) = groups[0]
+        return listOf(
+            Zone(
+                ZoneRect(insetPx, insetPx, wPx - insetPx, hPx - insetPx),
+                team,
+                Alignment.TopStart,
+                emptyList(),
+                false,
+            )
+        )
+    }
     return groups.mapIndexed { zi, (team, memberIdx) ->
         // Two groups split the board into top/bottom halves, first group
         // on top; three or four fall back to quadrants.
@@ -431,28 +517,20 @@ private fun computeZones(
             val members: List<ZoneMember>
             val rowMode = fit < 0.8f
             if (rowMode) {
-                // Crushed zone: full-width short rows stacked vertically
-                // instead of shrunken squares. Names stay big and readable;
-                // the rows fill the zone instead of huddling in its middle.
-                // Each row gets the same radial ring-guard as grid cells.
-                val maxRowH = with(density) { 64.dp.toPx() }
-                val gapY = with(density) { 8.dp.toPx() }
-                val rowH = ((zoneH - gapPx) / m - gapY)
-                    .coerceIn(with(density) { 40.dp.toPx() }, maxRowH)
-                val totalH = m * rowH + (m - 1) * gapY
-                var y = (rect.t + rect.b) / 2f - totalH / 2f + rowH / 2f
-                val rowCx = (rect.l + rect.r) / 2f
-                members = memberIdx.map { pi ->
-                    val rawY = y
-                    y += rowH + gapY
-                    val pushed = pushOutsideRing(
-                        Offset(rowCx, rawY),
-                        wPx / 2f, hPx / 2f,
-                        ringR + rowH / 2f + with(density) { 12.dp.toPx() },
-                    )
-                    val cyRow = pushed.y.coerceIn(rect.t + rowH / 2f, rect.b - rowH / 2f)
-                    ZoneMember(pi, Offset(rowCx - rect.l, cyRow - rect.t), rowH)
-                }
+                members = layoutRowMembers(
+                    memberIdx = memberIdx,
+                    rect = rect,
+                    zoneW = zoneW,
+                    zoneH = zoneH,
+                    wPx = wPx,
+                    hPx = hPx,
+                    gapY = with(density) { 8.dp.toPx() },
+                    padX = with(density) { 4.dp.toPx() },
+                    chipReserve = if (team != null) with(density) { 64.dp.toPx() } else 0f,
+                    wide = wide,
+                    cutR = ringR + dotD * 0.75f + with(density) { 12.dp.toPx() },
+                    density = density,
+                )
             } else {
                 val box = labelBoxPx * fit
                 val step = pitch * fit
@@ -486,7 +564,7 @@ private fun computeZones(
                         wPx / 2f, hPx / 2f,
                         ringR + dotD / 2f + box / 2f + with(density) { 12.dp.toPx() },
                     )
-                    ZoneMember(pi, Offset(pushed.x - rect.l, pushed.y - rect.t), box)
+                    ZoneMember(pi, Offset(pushed.x - rect.l, pushed.y - rect.t), box, box)
                 }
             }
             Zone(
@@ -958,12 +1036,15 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
 
             // Team mode: quadrants own the labels and each team gets a total
             // chip. Solo-only games keep the legacy edge layout exactly.
+            // A lone group does too (full-board tint, edge labels) so one
+            // team never crams into a single quadrant.
             val zoned = game.players.any { it.teamId != null }
             val zones: List<Zone> = if (zoned) {
                 remember(game.players, game.teams, wPx, layoutH, labelBoxPx, ringR, dotD, density) {
                     computeZones(game.players, game.teams, wPx, layoutH, labelBoxPx, ringR, dotD, density)
                 }
             } else emptyList()
+            val singleFull = zoned && zones.size == 1 && zones.all { it.members.isEmpty() }
             // Scores pushed out to the screen edges (memoized: pure layout
             // math, independent of gesture state). 1-3 players use the
             // seatAngle-driven layout (anchors at their natural rotary
@@ -971,7 +1052,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             // off their own ring-edge spot when there isn't one). 4+
             // players use the player-order band grid instead. Team games
             // read positions back out of the zone grids.
-            val labelPositions: Array<Offset?> = if (zoned) {
+            val labelPositions: Array<Offset?> = if (zoned && !singleFull) {
                 remember(zones) {
                     arrayOfNulls<Offset>(n).also { arr ->
                         zones.forEach { z ->
@@ -989,12 +1070,23 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                 }
             }
             // Per-player label box: uniform in legacy mode, fitted per zone
-            // member in team mode.
-            val memberBoxPx = if (zoned) {
+            // member in team mode (plus matching widths for rows).
+            val memberBoxPx = if (zoned && !singleFull) {
                 remember(zones) {
                     FloatArray(n) { labelBoxPx }.also { arr ->
                         zones.forEach { z ->
                             z.members.forEach { m -> arr[m.playerIndex] = m.boxPx }
+                        }
+                    }
+                }
+            } else {
+                remember(labelBoxPx, n) { FloatArray(n) { labelBoxPx } }
+            }
+            val memberWidthPx = if (zoned && !singleFull) {
+                remember(zones) {
+                    FloatArray(n) { labelBoxPx }.also { arr ->
+                        zones.forEach { z ->
+                            z.members.forEach { m -> arr[m.playerIndex] = m.rowW }
                         }
                     }
                 }
@@ -1014,9 +1106,9 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             // Geometry handle for the seat-swap trackers. Updated every
             // composition, read fresh on every touch event through the
             // stable object (the conditional write converges immediately).
-            val boardGeoState = remember { mutableStateOf(BoardGeo(game.players, dotAngles, labelPositions, memberBoxPx, zones)) }
-            val freshGeo = remember(game.players, dotAngles, labelPositions, memberBoxPx, zones) {
-                BoardGeo(game.players, dotAngles, labelPositions, memberBoxPx, zones)
+            val boardGeoState = remember { mutableStateOf(BoardGeo(game.players, dotAngles, labelPositions, memberBoxPx, memberWidthPx, with(density) { 4.dp.toPx() }, zones)) }
+            val freshGeo = remember(game.players, dotAngles, labelPositions, memberBoxPx, memberWidthPx, zones) {
+                BoardGeo(game.players, dotAngles, labelPositions, memberBoxPx, memberWidthPx, with(density) { 4.dp.toPx() }, zones)
             }
             if (boardGeoState.value !== freshGeo) boardGeoState.value = freshGeo
 
@@ -1339,7 +1431,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         buzz(ctx, millis, latestGame.hapticStrength)
                     }
                 }
-                if (!zoned) {
+                if (!zoned || singleFull) {
                     game.players.forEachIndexed { i, player ->
                         val pos = labelPositions[i]!!
                         val isActive = activeId == player.id
@@ -1417,8 +1509,10 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         ) {
                             zone.members.forEach { m ->
                                 val player = game.players[m.playerIndex]
+                                // Rows anchor at their computed left edge;
+                                // squares stay centered on their slot.
                                 val off = IntOffset(
-                                    x = (m.local.x - m.boxPx / 2f).toInt(),
+                                    x = (m.local.x - m.rowW / 2f).toInt(),
                                     y = (m.local.y - m.boxPx / 2f).toInt(),
                                 )
                                 key(player.id) {
@@ -1427,6 +1521,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                         score = totals[player.id] ?: 0,
                                         showName = game.showPlayerNames,
                                         compact = zone.rowMode,
+                                        rowWidthDp = dp(m.rowW),
                                         scoreSp = memberScoreSp(m.boxPx),
                                         boxDp = dp(m.boxPx),
                                         dimmed = activeId != null && activeId != player.id,
@@ -1940,6 +2035,8 @@ private fun SeatScore(
     // side by side instead of small squares. Still draggable; tap and
     // rotation are dropped (a wide strip can't turn inside its bounds).
     compact: Boolean = false,
+    /** Row width in dp (compact rows); null keeps the square box. */
+    rowWidthDp: Dp? = null,
 ) {
     val color = Color(player.color)
     // Count up/down to the new total instead of jumping to it. At rest the
@@ -1971,10 +2068,10 @@ private fun SeatScore(
         label = "seatSlide",
     )
     val glidingBase = if (glideBase) animatedBase else offsetPx
-    // Compact rows span the zone width; square labels keep their box.
-    // The drag offset applies in both (carry tracks the finger either
-    // way); layout x is centered for rows.
-    val placeX = if (compact) 0 else glidingBase.x
+    // Rows span their computed width at the layout's left edge; squares
+    // keep their box. The drag offset applies in both (carry tracks the
+    // finger either way).
+    val placeX = glidingBase.x
     Box(
         modifier = Modifier
             .offset {
@@ -1983,7 +2080,12 @@ private fun SeatScore(
                     (glidingBase.y + carry.y).toInt(),
                 )
             }
-            .then(if (compact) Modifier.fillMaxWidth().height(boxDp) else Modifier.size(boxDp))
+            .then(
+                if (compact) {
+                    (if (rowWidthDp != null) Modifier.width(rowWidthDp) else Modifier.fillMaxWidth())
+                        .height(boxDp)
+                } else Modifier.size(boxDp)
+            )
             .alpha(if (dimmed) 0.4f else 1f)
             .pointerInput(player.id) {
                 // Deliberately stateless: all tracking lives in [drag], so
