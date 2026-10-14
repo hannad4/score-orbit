@@ -409,7 +409,7 @@ private fun layoutRowMembers(
     val colW = ((zoneW - 2f * padX - (colCount - 1) * colGap) / colCount).coerceAtLeast(0f)
     val perCol = (memberIdx.size + colCount - 1) / colCount
     val rowH = ((bandH - (perCol - 1) * gapY) / perCol.coerceAtLeast(1))
-        .coerceIn(with(density) { 36.dp.toPx() }, with(density) { 64.dp.toPx() })
+        .coerceIn(with(density) { 34.dp.toPx() }, with(density) { 64.dp.toPx() })
     // Evenly spread what fits; overflow (absurd counts) packs downward.
     val totalH = perCol * rowH + (perCol - 1) * gapY
     val startY = bandTop + ((bandH - totalH) / 2f).coerceAtLeast(0f) + rowH / 2f
@@ -524,11 +524,13 @@ private fun computeZones(
                     zoneH = zoneH,
                     wPx = wPx,
                     hPx = hPx,
-                    gapY = with(density) { 8.dp.toPx() },
+                    gapY = with(density) { 6.dp.toPx() },
                     padX = with(density) { 4.dp.toPx() },
-                    chipReserve = if (team != null) with(density) { 64.dp.toPx() } else 0f,
+                    chipReserve = if (team != null) with(density) { 56.dp.toPx() } else 0f,
                     wide = wide,
-                    cutR = ringR + dotD * 0.75f + with(density) { 12.dp.toPx() },
+                    // Matches the backdrop hole below: ring outer edge
+                    // (ring + half the dot) plus a small margin.
+                    cutR = ringR + dotD * 0.5f + with(density) { 8.dp.toPx() },
                     density = density,
                 )
             } else {
@@ -1916,9 +1918,11 @@ private fun BoxScope.ZoneBackdrop(
                 color = tintColor.copy(alpha = tintAlpha),
                 cornerRadius = CornerRadius(with(d) { 24.dp.toPx() }),
             )
+                                    // Hole matches the row layout band: ring
+                                    // outer edge plus a small margin.
                                     drawCircle(
                                         color = boardBg,
-                                        radius = ringR + dotD * 0.75f + with(d) { 12.dp.toPx() },
+                                        radius = ringR + dotD * 0.5f + with(d) { 8.dp.toPx() },
                                         center = Offset(cx - zone.rect.l, cy - zone.rect.t),
                                     )
         }
