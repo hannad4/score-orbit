@@ -44,6 +44,8 @@ data class Game(
     val winMetric: WinMetric = WinMetric.HIGHEST,
     /** First-to-target score that ends the game, or null for endless scoring. */
     val targetScore: Int? = null,
+    /** Trophy badges for the top three scores on the board. */
+    val showRankBadges: Boolean = true,
     val keepLastVisible: Boolean = false,
     val enlargeActiveDot: Boolean = false,
     val showPlayerNames: Boolean = true,

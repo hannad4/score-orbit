@@ -87,6 +87,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         boardName: String = "",
         winMetric: WinMetric = WinMetric.HIGHEST,
         targetScore: Int? = null,
+        showRankBadges: Boolean = true,
         keepLastVisible: Boolean = false,
         enlargeActiveDot: Boolean = false,
         showPlayerNames: Boolean = true,
@@ -113,6 +114,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             tapPoints = tapPoints.coerceIn(0, 100),
             winMetric = winMetric,
             targetScore = targetScore?.takeIf { it >= 1 },
+            showRankBadges = showRankBadges,
             keepLastVisible = keepLastVisible,
             enlargeActiveDot = enlargeActiveDot,
             showPlayerNames = showPlayerNames,
@@ -137,6 +139,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             boardName = game.name,
             winMetric = game.winMetric,
             targetScore = game.targetScore,
+            showRankBadges = game.showRankBadges,
             keepLastVisible = game.keepLastVisible,
             enlargeActiveDot = game.enlargeActiveDot,
             showPlayerNames = game.showPlayerNames,
@@ -230,6 +233,11 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setShowPlayerNames(show: Boolean) {
         _currentGame.value = _currentGame.value?.copy(showPlayerNames = show)
+        persist()
+    }
+
+    fun setShowRankBadges(show: Boolean) {
+        _currentGame.value = _currentGame.value?.copy(showRankBadges = show)
         persist()
     }
 
@@ -452,6 +460,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         .put("keepLastVisible", game.keepLastVisible)
         .put("enlargeActiveDot", game.enlargeActiveDot)
         .put("showPlayerNames", game.showPlayerNames)
+        .put("showRankBadges", game.showRankBadges)
         .put("hapticsEnabled", game.hapticsEnabled)
         .put("hapticStrength", game.hapticStrength)
         .put("players", JSONArray(game.players.map { p ->
@@ -507,6 +516,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             keepLastVisible = o.optBoolean("keepLastVisible", false),
             enlargeActiveDot = o.optBoolean("enlargeActiveDot", false),
             showPlayerNames = o.optBoolean("showPlayerNames", true),
+            showRankBadges = o.optBoolean("showRankBadges", true),
             hapticsEnabled = o.optBoolean("hapticsEnabled", false),
             hapticStrength = o.optInt("hapticStrength", 65),
             entries = entries.filter { it.playerId in ids },

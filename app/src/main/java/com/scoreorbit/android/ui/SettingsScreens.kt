@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
@@ -431,6 +432,25 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    ListItem(
+                        headlineContent = { Text("Rank Badges") },
+                        supportingContent = { Text("Trophy for the top three scores") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.EmojiEvents,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = game.showRankBadges,
+                                onCheckedChange = { viewModel.setShowRankBadges(it) },
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
             }
 
                 SettingsGroup(label = "System Options") {

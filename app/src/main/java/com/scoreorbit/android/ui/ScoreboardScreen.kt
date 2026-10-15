@@ -1271,7 +1271,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 targeted = seatDrag.dropArmed &&
                                     zone.team?.id == seatDrag.dropTeamId,
                                 total = teamTotals[zone.team?.id] ?: 0,
-                                rank = teamRanks[zone.team?.id] ?: 0,
+                                rank = if (game.showRankBadges) teamRanks[zone.team?.id] ?: 0 else 0,
                             )
                         }
                     }
@@ -1471,7 +1471,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 // total; the live spin delta lives only in the center
                                 // readout while swiping, then commits on release.
                                 score = totals[player.id] ?: 0,
-                                rank = playerRanks[i],
+                                rank = if (game.showRankBadges) playerRanks[i] else 0,
                                 showName = game.showPlayerNames,
                                 scoreSp = memberScoreSp(memberBoxPx[i]),
                                 boxDp = dp(memberBoxPx[i]),
@@ -1545,7 +1545,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                     SeatScore(
                                         player = player,
                                         score = totals[player.id] ?: 0,
-                                        rank = playerRanks[m.playerIndex],
+                                        rank = if (game.showRankBadges) playerRanks[m.playerIndex] else 0,
                                         showName = game.showPlayerNames,
                                         compact = zone.rowMode,
                                         rowWidthDp = dp(m.rowW),
@@ -2022,9 +2022,11 @@ private fun TeamTotalChip(team: Team, total: Int, rank: Int, modifier: Modifier 
     }
     RankBadge(
         rank = rank,
+        // Hangs off the chip's bottom-end corner, clear of the digits —
+        // the zone gives the chip 12dp of breathing room all around.
         modifier = Modifier
             .align(Alignment.BottomEnd)
-            .padding(end = 8.dp, bottom = 2.dp),
+            .offset(x = 10.dp, y = 10.dp),
     )
     }
 }
