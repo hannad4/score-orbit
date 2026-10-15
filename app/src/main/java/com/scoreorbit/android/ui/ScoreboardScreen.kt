@@ -416,7 +416,7 @@ private fun layoutRowMembers(
     val colW = ((zoneW - 2f * padX - (colCount - 1) * colGap) / colCount).coerceAtLeast(0f)
     val perCol = (memberIdx.size + colCount - 1) / colCount
     val rowH = ((bandH - (perCol - 1) * gapY) / perCol.coerceAtLeast(1))
-        .coerceIn(with(density) { 34.dp.toPx() }, with(density) { 64.dp.toPx() })
+        .coerceIn(with(density) { 32.dp.toPx() }, with(density) { 64.dp.toPx() })
     // Evenly spread what fits; overflow (absurd counts) packs downward.
     val totalH = perCol * rowH + (perCol - 1) * gapY
     val startY = bandTop + ((bandH - totalH) / 2f).coerceAtLeast(0f) + rowH / 2f
@@ -514,7 +514,7 @@ private fun computeZones(
                 hPx = hPx,
                 gapY = with(density) { 6.dp.toPx() },
                 padX = with(density) { 4.dp.toPx() },
-                chipReserve = if (team != null) with(density) { 56.dp.toPx() } else 0f,
+                chipReserve = if (team != null) with(density) { 72.dp.toPx() } else 0f,
                 wide = wide,
                 // Matches the backdrop hole below: ring outer edge
                 // (ring + half the dot) plus a small margin.
@@ -1498,6 +1498,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                         showName = game.showPlayerNames,
                                         compact = zone.rowMode,
                                         rowWidthDp = dp(m.rowW),
+                                        matchNameSize = zone.members.size == 1,
                                         scoreSp = memberScoreSp(m.boxPx),
                                         boxDp = dp(m.boxPx),
                                         dimmed = activeId != null && activeId != player.id,
@@ -2050,6 +2051,8 @@ private fun SeatScore(
     compact: Boolean = false,
     /** Row width in dp (compact rows); null keeps the square box. */
     rowWidthDp: Dp? = null,
+    /** Compact score renders at the name size (lone-member rows). */
+    matchNameSize: Boolean = false,
 ) {
     val color = Color(player.color)
     // Count up/down to the new total instead of jumping to it. At rest the
@@ -2190,7 +2193,7 @@ private fun SeatScore(
                 }
                 Text(
                     text = text,
-                    fontSize = size.sp,
+                    fontSize = (if (matchNameSize) nameSize else size).sp,
                     fontWeight = FontWeight.Bold,
                     color = color,
                     maxLines = 1,
