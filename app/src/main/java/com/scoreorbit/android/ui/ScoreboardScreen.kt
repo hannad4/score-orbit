@@ -403,9 +403,16 @@ private fun layoutRowMembers(
     val bandTop = (if (isTop) rect.t + chipReserve else maxOf(rect.t, cyD + cutR))
     val bandBot = (if (isTop) minOf(rect.b, cyD - cutR) else rect.b - chipReserve)
     val bandH = (bandBot - bandTop).coerceAtLeast(0f)
-    // Columns: halves split left/right, side zones keep one full column.
-    val colCount = if (wide) 2 else 1
-    val colGap = if (wide) gapY * 1.5f else 0f
+    // Columns: halves split left/right once they hold more than a pair;
+    // side zones stay single-column through four members, then split
+    // rather than overflow. Single rows center in their band.
+    val colCount = when {
+        memberIdx.size <= 2 -> 1
+        wide -> 2
+        memberIdx.size > 4 -> 2
+        else -> 1
+    }
+    val colGap = if (colCount > 1) gapY * 1.5f else 0f
     val colW = ((zoneW - 2f * padX - (colCount - 1) * colGap) / colCount).coerceAtLeast(0f)
     val perCol = (memberIdx.size + colCount - 1) / colCount
     val rowH = ((bandH - (perCol - 1) * gapY) / perCol.coerceAtLeast(1))
@@ -420,13 +427,13 @@ private fun layoutRowMembers(
     // bottom zones upward.
     val nudge = with(density) { 4.dp.toPx() } * if (isTop) 1f else -1f
     return memberIdx.mapIndexed { k, pi ->
-        // Column of this member: halves fill left column first.
-        val c = if (!wide) 0 else if (k < split) 0 else 1
-        val row = if (!wide) k else if (k < split) k else k - split
-        val left = if (!wide) rect.l + padX
+        // Column of this member: multi-column zones fill left first.
+        val c = if (colCount == 1) 0 else if (k < split) 0 else 1
+        val row = if (colCount == 1) k else if (k < split) k else k - split
+        val left = if (colCount == 1) rect.l + padX
         else if (c == 0) rect.l + padX
         else rect.r - padX - colW
-        val width = if (wide) colW else zoneW - 2f * padX
+        val width = if (colCount == 1) zoneW - 2f * padX else colW
         val centerX = left + width / 2f
         val centerY = (yAt(row) + nudge).coerceIn(rect.t + rowH / 2f, rect.b - rowH / 2f)
         ZoneMember(pi, Offset(centerX - rect.l, centerY - rect.t), rowH, width)
@@ -445,7 +452,6 @@ private fun computeZones(
     teams: List<Team>,
     wPx: Float,
     hPx: Float,
-    labelBoxPx: Float,
     ringR: Float,
     dotD: Float,
     density: Density,
@@ -464,7 +470,6 @@ private fun computeZones(
         groups.add(last.first to (last.second + overflow.second))
     }
     val corners = listOf(Alignment.TopStart, Alignment.TopEnd, Alignment.BottomStart, Alignment.BottomEnd)
-    val gapPx = with(density) { 12.dp.toPx() }
     val insetPx = with(density) { 4.dp.toPx() }
     // A lone group owns the whole board: it gets the legacy edge layout
     // (which already handles any count) under a full-board tint, so one
@@ -494,84 +499,28 @@ private fun computeZones(
                 2 -> ZoneRect(insetPx, hPx / 2f + insetPx, wPx / 2f - insetPx, hPx - insetPx)
                 else -> ZoneRect(wPx / 2f + insetPx, hPx / 2f + insetPx, wPx - insetPx, hPx - insetPx)
             }
-            val m = memberIdx.size
-            // Wide zones (halves) fill across; square ones stay compact.
-            // Three across in a single row beats a 2+1 stagger.
             val zoneW = rect.r - rect.l
             val zoneH = rect.b - rect.t
             val wide = zoneW > zoneH * 1.25f
-            val cols = when {
-                m <= 1 -> 1
-                m == 2 -> 2
-                wide -> min(3, m)
-                m == 3 -> 3
-                m <= 4 -> 2
-                else -> 3
-            }
-            val rows = (m + cols - 1) / cols
-            val pitch = labelBoxPx + gapPx
-            val fit = min(
-                1f,
-                min(
-                    (zoneW - gapPx) / (cols * pitch),
-                    (zoneH - gapPx) / (rows * pitch),
-                ),
-            ).coerceAtLeast(0.4f)
-            val members: List<ZoneMember>
-            val rowMode = fit < 0.8f
-            if (rowMode) {
-                members = layoutRowMembers(
-                    memberIdx = memberIdx,
-                    rect = rect,
-                    zoneW = zoneW,
-                    zoneH = zoneH,
-                    wPx = wPx,
-                    hPx = hPx,
-                    gapY = with(density) { 6.dp.toPx() },
-                    padX = with(density) { 4.dp.toPx() },
-                    chipReserve = if (team != null) with(density) { 56.dp.toPx() } else 0f,
-                    wide = wide,
-                    // Matches the backdrop hole below: ring outer edge
-                    // (ring + half the dot) plus a small margin.
-                    cutR = ringR + dotD * 0.5f + with(density) { 8.dp.toPx() },
-                    density = density,
-                )
-            } else {
-                val box = labelBoxPx * fit
-                val step = pitch * fit
-                // Grid center pushed outward from the dial so member labels
-                // clear the ring, then clamped so the fitted grid stays inside
-                // its zone.
-                val rawCx = (rect.l + rect.r) / 2f
-                val rawCy = (rect.t + rect.b) / 2f
-                val dx = rawCx - wPx / 2f
-                val dy = rawCy - hPx / 2f
-                val len = sqrt(dx * dx + dy * dy)
-                val push = min(zoneW, zoneH) * 0.18f
-                val wantCx = if (len > 0f) rawCx + dx / len * push else rawCx
-                val wantCy = if (len > 0f) rawCy + dy / len * push else rawCy
-                val hw = ((cols - 1) * step + box) / 2f
-                val hh = ((rows - 1) * step + box) / 2f
-                val gcX = if (hw * 2f >= zoneW) rawCx else wantCx.coerceIn(rect.l + hw, rect.r - hw)
-                val gcY = if (hh * 2f >= zoneH) rawCy else wantCy.coerceIn(rect.t + hh, rect.b - hh)
-                val cx = gcX - rect.l
-                val cy = gcY - rect.t
-                members = memberIdx.mapIndexed { k, pi ->
-                    val gy = k / cols
-                    val rowLen = min(cols, m - gy * cols)
-                    val gx = k % cols
-                    val x = cx + (gx - (rowLen - 1) / 2f) * step
-                    val y = cy + (gy - (rows - 1) / 2f) * step
-                    // Same hard guarantee as the band grid: grid cells near the
-                    // dial's inner corner get pushed back out radially.
-                    val pushed = pushOutsideRing(
-                        Offset(rect.l + x, rect.t + y),
-                        wPx / 2f, hPx / 2f,
-                        ringR + dotD / 2f + box / 2f + with(density) { 12.dp.toPx() },
-                    )
-                    ZoneMember(pi, Offset(pushed.x - rect.l, pushed.y - rect.t), box, box)
-                }
-            }
+            // Team zones always list members as rows (name + score side by
+            // side): one visual language at every count, so dragging players
+            // between teams never morphs the layout mid-gesture.
+            val members = layoutRowMembers(
+                memberIdx = memberIdx,
+                rect = rect,
+                zoneW = zoneW,
+                zoneH = zoneH,
+                wPx = wPx,
+                hPx = hPx,
+                gapY = with(density) { 6.dp.toPx() },
+                padX = with(density) { 4.dp.toPx() },
+                chipReserve = if (team != null) with(density) { 56.dp.toPx() } else 0f,
+                wide = wide,
+                // Matches the backdrop hole below: ring outer edge
+                // (ring + half the dot) plus a small margin.
+                cutR = ringR + dotD * 0.5f + with(density) { 8.dp.toPx() },
+                density = density,
+            )
             Zone(
                 rect,
                 team,
@@ -581,7 +530,7 @@ private fun computeZones(
                     corners[zi]
                 },
                 members,
-                rowMode,
+                true,
             )
         }
 }
@@ -1048,8 +997,8 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             // team never crams into a single quadrant.
             val zoned = game.players.any { it.teamId != null }
             val zones: List<Zone> = if (zoned) {
-                remember(game.players, game.teams, wPx, layoutH, labelBoxPx, ringR, dotD, density) {
-                    computeZones(game.players, game.teams, wPx, layoutH, labelBoxPx, ringR, dotD, density)
+                remember(game.players, game.teams, wPx, layoutH, ringR, dotD, density) {
+                    computeZones(game.players, game.teams, wPx, layoutH, ringR, dotD, density)
                 }
             } else emptyList()
             val singleFull = zoned && zones.size == 1 && zones.all { it.members.isEmpty() }
