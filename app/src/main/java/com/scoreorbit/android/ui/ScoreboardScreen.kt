@@ -1106,6 +1106,22 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
             val teamTotals = remember(game.entries, game.players, game.teams) {
                 game.teamScoresMap()
             }
+            // Podium ranks follow the win metric. Team games badge each team
+            // plus any solo players (ranked among solos).
+            val lowestWins = game.winMetric == WinMetric.LOWEST
+            val teamRanks = remember(teamTotals, lowestWins) {
+                podiumRanks(teamTotals.values.toList(), lowestWins)
+                    .let { r -> teamTotals.keys.zip(r).toMap() }
+            }
+            val playerRanks = remember(totals, game.players, zoned, lowestWins) {
+                // Team members carry no badge; solos in a team game are
+                // ranked among themselves, as on the leaderboard.
+                val ranked = game.players.withIndex().filter { !zoned || it.value.teamId == null }
+                val r = podiumRanks(ranked.map { totals[it.value.id] ?: 0 }, lowestWins)
+                IntArray(game.players.size).also { out ->
+                    ranked.forEachIndexed { k, iv -> out[iv.index] = r[k] }
+                }
+            }
             // Dial angles, one dot parked near its own score then snapped
             // to even spacing (memoized likewise).
             val dotAngles: DoubleArray = remember(labelPositions, cx, cy, ringR, dotD) {
@@ -1255,6 +1271,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 targeted = seatDrag.dropArmed &&
                                     zone.team?.id == seatDrag.dropTeamId,
                                 total = teamTotals[zone.team?.id] ?: 0,
+                                rank = teamRanks[zone.team?.id] ?: 0,
                             )
                         }
                     }
@@ -1454,6 +1471,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                 // total; the live spin delta lives only in the center
                                 // readout while swiping, then commits on release.
                                 score = totals[player.id] ?: 0,
+                                rank = playerRanks[i],
                                 showName = game.showPlayerNames,
                                 scoreSp = memberScoreSp(memberBoxPx[i]),
                                 boxDp = dp(memberBoxPx[i]),
@@ -1527,6 +1545,7 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                                     SeatScore(
                                         player = player,
                                         score = totals[player.id] ?: 0,
+                                        rank = playerRanks[m.playerIndex],
                                         showName = game.showPlayerNames,
                                         compact = zone.rowMode,
                                         rowWidthDp = dp(m.rowW),
@@ -1912,6 +1931,7 @@ private fun BoxScope.ZoneBackdrop(
     density: Density,
     targeted: Boolean,
     total: Int,
+    rank: Int,
 ) {
     val team = zone.team
     val d = LocalDensity.current
@@ -1935,6 +1955,7 @@ private fun BoxScope.ZoneBackdrop(
         TeamTotalChip(
             team = team,
             total = total,
+            rank = rank,
             modifier = Modifier
                 .align(zone.corner)
                 .padding(12.dp),
@@ -1953,11 +1974,34 @@ private fun BoxScope.ZoneBackdrop(
     }
 }
 
+/**
+ * Podium rank per score: 1 + the number of strictly better scores, so ties
+ * share a rank (same rule as the leaderboard). Empty until scores differ,
+ * so a fresh board doesn't crown everyone "1st".
+ */
+private fun podiumRanks(scores: List<Int>, lowestWins: Boolean): List<Int> {
+    if (scores.distinct().size < 2) return scores.map { 0 }
+    return scores.map { sc -> scores.count { if (lowestWins) it < sc else it > sc } + 1 }
+}
+
+/** Gold/silver/bronze trophy (leaderboard colors); nothing outside the top three. */
+@Composable
+private fun RankBadge(rank: Int, modifier: Modifier = Modifier) {
+    val medal = medalFor(rank) ?: return
+    Icon(
+        imageVector = Icons.Filled.EmojiEvents,
+        contentDescription = when (rank) { 1 -> "1st place"; 2 -> "2nd place"; else -> "3rd place" },
+        tint = medal,
+        modifier = modifier.size(20.dp),
+    )
+}
+
 /** Team name + collective total. Display only — never consumes touches. */@Composable
-private fun TeamTotalChip(team: Team, total: Int, modifier: Modifier = Modifier) {
+private fun TeamTotalChip(team: Team, total: Int, rank: Int, modifier: Modifier = Modifier) {
+    Box(modifier = modifier) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
+        modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(horizontal = 12.dp, vertical = 6.dp),
@@ -1975,6 +2019,13 @@ private fun TeamTotalChip(team: Team, total: Int, modifier: Modifier = Modifier)
             fontWeight = FontWeight.Bold,
             color = Color(team.color),
         )
+    }
+    RankBadge(
+        rank = rank,
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(end = 8.dp, bottom = 2.dp),
+    )
     }
 }
 
@@ -2027,6 +2078,7 @@ private fun SeatDot(
 private fun SeatScore(
     player: Player,
     score: Int,
+    rank: Int,
     showName: Boolean,
     scoreSp: Float,
     boxDp: Dp,
@@ -2209,15 +2261,25 @@ private fun SeatScore(
                     textAlign = TextAlign.Center,
                 )
             }
-            Text(
-                text = text,
-                fontSize = size.sp,
-                fontWeight = FontWeight.Bold,
-                color = color,
-                maxLines = 1,
-                textAlign = TextAlign.Center,
-            )
+            // Trophy hangs off the digits' bottom-right corner, not the
+            // label box's.
+            Box {
+                Text(
+                    text = text,
+                    fontSize = size.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = color,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                )
+                RankBadge(
+                    rank,
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .offset(x = 14.dp, y = (-2).dp),
+                )
             }
+        }
         }
     }
 }
