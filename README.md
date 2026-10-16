@@ -16,7 +16,10 @@ Ring scorekeeper for game night — spin to score.
 ## Contents
 
 - [What it is](#what-it-is)
-- [Features](#features)
+- [Spin to score](#spin-to-score)
+- [Split the table](#split-the-table)
+- [Know who's winning](#know-whos-winning)
+- [Everything else](#everything-else)
 - [Screens](#screens)
 - [Download](#download)
 - [Build from source](#build-from-source)
@@ -29,19 +32,31 @@ A scorekeeper for game night on Android, inspired by the Score Anything app on i
 
 Paper scorekeeping means hunting for a pen, doing arithmetic between turns, and arguing over chicken-scratch handwriting. Score Orbit puts every player on one shared dial in the middle of the table: drag around the ring the way you'd dial an old rotary phone, a full turn adds your points, and letting go snaps the dial back with a spring. Anyone can reach over and dial in their own score.
 
-## Features
+## Spin to score
 
-- ☎️ **Rotary dial scoring** — drag around the ring for big points, tap a dot for quick points, tap a score to turn it toward its player
-- 🔄 **Rearrange on the board** — long-press a score and drag it onto another seat to swap the two, with a glide transition
-- 👥 **1–12 players** — names, colors, drag-to-reorder roster, live ring preview while you set up
-- 🟪 **Teams** — pick a count and players are dealt out randomly and evenly; drag scores between tinted areas to move them, each area showing its collective total
-- 🎯 **Score to Win** — set a target and the game ends in confetti, or leave it blank and play endless
-- 🏆 **Rank badges** — gold/silver/bronze trophies on the top three scores (toggleable), following the Highest/Lowest setting
-- 🥇 **Leaderboard** — medal cards, ties share a rank, teams and solos ranked separately
+![Spin to score](docs/shots/hero-score.png)
+
+The board stays on the table and the dial does the arithmetic. Scores sit outside the ring facing each player's seat for 1–12 players, and a long-press drag swaps any two seats with a glide transition.
+
+## Split the table
+
+![Split the table](docs/shots/hero-teams.png)
+
+Pick a team count and players are dealt out randomly and evenly. Two teams split the board top and bottom, more teams get quadrants — everyone still scores individually while each area carries its live total.
+
+## Know who's winning
+
+![Know who's winning](docs/shots/hero-race.png)
+
+Trophies on the top three scores follow the Highest/Lowest setting, the leaderboard ranks everyone with medal highlights, and a Score to Win target ends the game in confetti — or leave it blank and play endless.
+
+## Everything else
+
 - 🕘 **Score history** — every entry in a ledger with undo/redo, newest first
 - 📳 **Gesture-safe board** — the bottom strip ignores touches, so swiping home never scores by accident
 - 💾 **Never loses your game** — setup, scores, and undo history save on every change and restore on launch
 - 🎨 **Adaptive everything** — system light/dark theme (or override), Material You dynamic colors on Android 12+, haptics with adjustable strength
+- 🧩 **Built with Material 3 Expressive** throughout — collapsing app bars, tonal buttons, segmented controls, spring physics on the dial itself
 
 ## Screens
 
@@ -53,6 +68,7 @@ Paper scorekeeping means hunting for a pen, doing arithmetic between turns, and 
 <p align="center">
   <img src="docs/shots/history.png" width="220" alt="Score history">
   <img src="docs/shots/leaderboard.png" width="220" alt="Leaderboard">
+  <img src="docs/shots/teams.png" width="220" alt="Teams">
 </p>
 
 ## Download
