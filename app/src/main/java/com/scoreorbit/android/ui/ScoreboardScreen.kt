@@ -87,10 +87,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -765,15 +763,6 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     // Turn timer: collapsed chip in the top bar expands into a full-width
     // timer strip (same real estate, no overlay over the board).
     var timerExpanded by remember { mutableStateOf(false) }
-    // Timer expiry bump: one long pulse per completion, only when haptics
-    // are enabled for the overall board.
-    val hapticFeedback = LocalHapticFeedback.current
-    val timerDoneTick = viewModel.timerDoneTick.value
-    LaunchedEffect(timerDoneTick) {
-        if (timerDoneTick > 0 && game.hapticsEnabled) {
-            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-        }
-    }
     // Restart-proof drag tracking (see SeatDragState).
     val seatDrag = remember(game.id) { SeatDragState() }
     // Seat fingerprint for the dial detector keys (order changes it,

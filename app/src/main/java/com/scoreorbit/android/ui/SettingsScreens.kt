@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -115,6 +116,7 @@ import androidx.compose.ui.zIndex
 import com.scoreorbit.android.model.Game
 import com.scoreorbit.android.model.Player
 import com.scoreorbit.android.model.Team
+import com.scoreorbit.android.model.TimerAlert
 import com.scoreorbit.android.model.WinMetric
 import com.scoreorbit.android.ui.theme.ScoreOrbitColors
 import com.scoreorbit.android.viewmodel.AppScreen
@@ -143,7 +145,7 @@ private val hapticLevels = listOf(
 /** Game settings: scoreboard identity, setup, and scoring rules. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
+fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollState? = null) {
     var showRestartConfirm by remember { mutableStateOf(false) }
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val ctx = LocalContext.current
@@ -177,7 +179,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState ?: rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
@@ -374,64 +376,6 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                                 if (!focus.isFocused) commitTarget()
                             },
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    ListItem(
-                        headlineContent = { Text("Turn Timer") },
-                        supportingContent = { Text("Countdown pill on the board's top bar") },
-                        leadingContent = {
-                            Icon(
-                                Icons.Default.Timer,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        trailingContent = {
-                            Switch(
-                                checked = game.showTimer,
-                                onCheckedChange = { viewModel.setShowTimer(it) },
-                            )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    )
-                    AnimatedVisibility(
-                        visible = game.showTimer,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically(),
-                    ) {
-                        // Duration presets, haptics-style: the segments pick
-                        // what the board's timer arms to (and what Reset
-                        // restores). The board itself nudges the countdown
-                        // by 15 seconds once a game is underway.
-                        val timerPresets = listOf(60, 120, 180, 300)
-                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                            Text(
-                                "Default Duration",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                                timerPresets.forEachIndexed { i, sec ->
-                                    SegmentedButton(
-                                        selected = game.timerStartSec == sec,
-                                        onClick = { viewModel.setTimerStartSec(sec) },
-                                        shape = SegmentedButtonDefaults.itemShape(
-                                            index = i,
-                                            count = timerPresets.size,
-                                        ),
-                                    ) {
-                                        Text("${sec / 60}m")
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                "Tap the timer on the board to expand it — 15-second steps, start, pause and reset.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
                 }
 
                 SettingsGroup(label = "Board View") {
@@ -513,6 +457,104 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
             }
 
                 SettingsGroup(label = "System Options") {
+                    ListItem(
+                        headlineContent = { Text("Timer") },
+                        supportingContent = { Text("Countdown pill on the board's top bar") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Timer,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = game.showTimer,
+                                onCheckedChange = { viewModel.setShowTimer(it) },
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
+                    AnimatedVisibility(
+                        visible = game.showTimer,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically(),
+                    ) {
+                        Column {
+                            // Time's up alarm, segmented like the strength
+                            // control. "Vibration" and "Both" preview
+                            // themselves on tap (300ms), like the haptic
+                            // strength segments do.
+                            val alertLabels: List<Pair<String, TimerAlert>> = listOf(
+                                "Sound" to TimerAlert.SOUND,
+                                "Vibration" to TimerAlert.VIBRATE,
+                                "Both" to TimerAlert.BOTH,
+                                "Silent" to TimerAlert.OFF,
+                            )
+                            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                                Text(
+                                    "Time's Up Alarm",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                    alertLabels.forEachIndexed { i, (label, mode) ->
+                                        SegmentedButton(
+                                            selected = game.timerAlert == mode,
+                                            onClick = {
+                                                viewModel.setTimerAlert(mode)
+                                                if (mode == TimerAlert.VIBRATE || mode == TimerAlert.BOTH) {
+                                                    buzz(ctx, 300, game.hapticStrength)
+                                                }
+                                            },
+                                            shape = SegmentedButtonDefaults.itemShape(
+                                                index = i,
+                                                count = alertLabels.size,
+                                            ),
+                                        ) {
+                                            Text(label)
+                                        }
+                                    }
+                                }
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            // Duration presets, haptics-style: the segments pick
+                            // what the board's timer arms to (and what Reset
+                            // restores). The board itself nudges the countdown
+                            // by 15 seconds once a game is underway.
+                            val timerPresets = listOf(60, 120, 180, 300)
+                            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                                Text(
+                                    "Default Duration",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                    timerPresets.forEachIndexed { i, sec ->
+                                        SegmentedButton(
+                                            selected = game.timerStartSec == sec,
+                                            onClick = { viewModel.setTimerStartSec(sec) },
+                                            shape = SegmentedButtonDefaults.itemShape(
+                                                index = i,
+                                                count = timerPresets.size,
+                                            ),
+                                        ) {
+                                            Text("${sec / 60}m")
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    "Tap the timer on the board to expand it — 15-second steps, start, pause and reset.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
                         headlineContent = { Text("Haptics") },
                         supportingContent = { Text("Buzz on every full turn") },

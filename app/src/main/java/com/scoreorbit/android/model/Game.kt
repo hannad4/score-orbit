@@ -27,6 +27,11 @@ enum class WinMetric {
     HIGHEST, LOWEST;
 }
 
+/** What plays when the turn timer hits zero. */
+enum class TimerAlert {
+    SOUND, VIBRATE, BOTH, OFF;
+}
+
 data class ScoreEntry(
     val id: String = java.util.UUID.randomUUID().toString(),
     val playerId: String,
@@ -53,6 +58,8 @@ data class Game(
     val hapticStrength: Int = 65,
     /** Whether the turn timer pill is offered on the board's top bar. */
     val showTimer: Boolean = true,
+    /** What plays when the turn timer reaches zero. */
+    val timerAlert: TimerAlert = TimerAlert.BOTH,
     /** Default turn-timer duration the board starts from, in seconds. */
     val timerStartSec: Int = 120,
     val entries: List<ScoreEntry> = emptyList(),

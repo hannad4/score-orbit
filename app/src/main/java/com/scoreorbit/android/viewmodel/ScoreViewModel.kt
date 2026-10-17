@@ -12,8 +12,12 @@ import com.scoreorbit.android.model.Player
 import com.scoreorbit.android.model.Rotation
 import com.scoreorbit.android.model.ScoreEntry
 import com.scoreorbit.android.model.Team
+import com.scoreorbit.android.model.TimerAlert
 import com.scoreorbit.android.model.WinMetric
 import com.scoreorbit.android.ui.theme.ScoreOrbitColors
+import com.scoreorbit.android.ui.buzz
+import android.media.AudioManager
+import android.media.ToneGenerator
 import com.scoreorbit.android.util.RotationUtils
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -300,6 +304,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
                         _timerMs.value = 0L
                         _timerRunning.value = false
                         _timerDoneTick.value += 1
+                        fireTimerAlert()
                         break
                     }
                     _timerMs.value = left
@@ -338,6 +343,37 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         _timerSetMs.value = (_currentGame.value?.timerStartSec ?: 120) * 1000L
         _timerMs.value = _timerSetMs.value
         persist()
+    }
+
+    /** Settings: what plays when the timer reaches zero. */
+    fun setTimerAlert(mode: TimerAlert) {
+        _currentGame.value = _currentGame.value?.copy(timerAlert = mode)
+        persist()
+    }
+
+    /**
+     * Time's up flourish: a solid double-beep and/or a heavy multi-pulse
+     * buzz at the board's configured haptic strength. Delayed until the
+     * 0:00 reads out first, so nothing talks over the display.
+     */
+    private fun fireTimerAlert() {
+        val game = _currentGame.value ?: return
+        val mode = game.timerAlert
+        if (mode == TimerAlert.OFF) return
+        viewModelScope.launch {
+            delay(300)
+            if (mode == TimerAlert.SOUND || mode == TimerAlert.BOTH) {
+                runCatching {
+                    val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 80)
+                    tone.startTone(ToneGenerator.TONE_PROP_BEEP2, 700)
+                    delay(900)
+                    tone.release()
+                }
+            }
+            if (mode == TimerAlert.VIBRATE || mode == TimerAlert.BOTH) {
+                buzz(getApplication(), 400L, game.hapticStrength)
+            }
+        }
     }
 
     fun setKeepLastVisible(keep: Boolean) {
@@ -583,6 +619,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         .put("hapticsEnabled", game.hapticsEnabled)
         .put("hapticStrength", game.hapticStrength)
         .put("showTimer", game.showTimer)
+        .put("timerAlert", game.timerAlert.name)
         .put("timerStartSec", game.timerStartSec)
         .put("players", JSONArray(game.players.map { p ->
             JSONObject()
@@ -641,6 +678,8 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             hapticsEnabled = o.optBoolean("hapticsEnabled", false),
             hapticStrength = o.optInt("hapticStrength", 65),
             showTimer = o.optBoolean("showTimer", true),
+            timerAlert = runCatching { TimerAlert.valueOf(o.getString("timerAlert")) }
+                .getOrDefault(TimerAlert.BOTH),
             timerStartSec = o.optInt("timerStartSec", 120).coerceIn(15, 3600),
             entries = entries.filter { it.playerId in ids },
         )
