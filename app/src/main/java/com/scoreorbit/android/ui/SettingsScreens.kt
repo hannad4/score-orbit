@@ -28,6 +28,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.items
@@ -83,6 +85,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -225,13 +228,12 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                 }
 
                 SettingsGroup(label = "Players") {
-                    // Twin steppers, mirroring the Scoring cells: players on
-                    // the left, teams on the right. Teams default to 0,
-                    // players to 2.
+                    // Stepper for the player count (free range, so a stepper
+                    // fits); teams below as pills — the sensible team counts
+                    // are a fixed choice, not a range.
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
                     ) {
                         StepperCell(
                             value = "${game.players.size}",
@@ -240,16 +242,37 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                             onPlus = { viewModel.setPlayerCount(game.players.size + 1) },
                             minusEnabled = game.players.size > 1,
                             plusEnabled = game.players.size < 12,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
                         )
-                        StepperCell(
-                            value = "${game.teams.size}",
-                            caption = "Number of Teams",
-                            onMinus = { viewModel.setTeamCount(game.teams.size - 1) },
-                            onPlus = { viewModel.setTeamCount(game.teams.size + 1) },
-                            minusEnabled = game.teams.size > 0,
-                            plusEnabled = game.teams.size < 4,
-                            modifier = Modifier.weight(1f),
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(
+                            "Number of Teams",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val teamOptions = listOf(0, 2, 3, 4)
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            teamOptions.forEachIndexed { i, count ->
+                                SegmentedButton(
+                                    selected = game.teams.size == count,
+                                    onClick = { viewModel.setTeamCount(count) },
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = i,
+                                        count = teamOptions.size,
+                                    ),
+                                ) {
+                                    Text(if (count == 0) "Solo" else "$count")
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            "Players are dealt out evenly at random across the teams.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -378,7 +401,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                     )
                 }
 
-                SettingsGroup(label = "Board View") {
+                SettingsGroup(label = "Board Display") {
                     ListItem(
                         headlineContent = { Text("Show Player Names") },
                         supportingContent = { Text("Display names beside scores") },
@@ -720,11 +743,11 @@ private fun StepperCell(
         )
         Spacer(modifier = Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            FilledTonalIconButton(onClick = onMinus, enabled = minusEnabled, modifier = Modifier.size(32.dp)) {
+            HoldRepeatButton(onClick = onMinus, enabled = minusEnabled) {
                 Icon(Icons.Default.Remove, contentDescription = "Decrease")
             }
             Spacer(modifier = Modifier.width(12.dp))
-            FilledTonalIconButton(onClick = onPlus, enabled = plusEnabled, modifier = Modifier.size(32.dp)) {
+            HoldRepeatButton(onClick = onPlus, enabled = plusEnabled) {
                 Icon(Icons.Default.Add, contentDescription = "Increase")
             }
         }
@@ -737,6 +760,43 @@ private fun StepperCell(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+/**
+ * Stepper button with press-and-hold auto-repeat: a tap counts once on
+ * release, but holding past ~450ms starts rounding off a ~10Hz repeat
+ * (the hold also suppresses the release click, so one gesture is one step
+ * only when it began as a tap).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HoldRepeatButton(
+    onClick: () -> Unit,
+    enabled: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    var repeated by remember { mutableStateOf(false) }
+    LaunchedEffect(pressed, enabled) {
+        if (pressed && enabled) {
+            repeated = false
+            delay(450)
+            while (true) {
+                onClick()
+                repeated = true
+                delay(90)
+            }
+        }
+    }
+    FilledTonalIconButton(
+        onClick = { if (!repeated) onClick() },
+        enabled = enabled,
+        interactionSource = interaction,
+        modifier = Modifier.size(32.dp),
+    ) {
+        content()
     }
 }
 
