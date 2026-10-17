@@ -71,14 +71,14 @@ Trophies on the top three scores follow the Highest/Lowest setting, the leaderbo
 ## Screens
 
 <p align="center">
-  <img src="docs/shots/board.png" width="220" alt="The ring">
-  <img src="docs/shots/players.png" width="220" alt="Roster setup">
-  <img src="docs/shots/settings.png" width="220" alt="Settings">
+  <img src="docs/shots/tile-board.png" width="220" alt="The ring">
+  <img src="docs/shots/tile-players.png" width="220" alt="Roster setup">
+  <img src="docs/shots/tile-settings.png" width="220" alt="Settings">
 </p>
 <p align="center">
-  <img src="docs/shots/history.png" width="220" alt="Score history">
-  <img src="docs/shots/leaderboard.png" width="220" alt="Leaderboard">
-  <img src="docs/shots/teams.png" width="220" alt="Teams">
+  <img src="docs/shots/tile-history.png" width="220" alt="Score history">
+  <img src="docs/shots/tile-leaderboard.png" width="220" alt="Leaderboard">
+  <img src="docs/shots/tile-teams.png" width="220" alt="Teams">
 </p>
 
 <p align="center"><img src="docs/shots/hr.png" width="50%" alt=""></p>
