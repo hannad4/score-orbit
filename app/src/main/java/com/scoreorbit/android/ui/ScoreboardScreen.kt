@@ -1,5 +1,6 @@
 package com.scoreorbit.android.ui
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateIntAsState
@@ -915,9 +916,10 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            if (timerExpanded) {
+            if (timerExpanded && game.showTimer) {
                 TurnTimerBar(
                     timerMs = viewModel.timerMs.value,
+                    timerSetMs = viewModel.timerSetMs.value,
                     timerRunning = viewModel.timerRunning.value,
                     onAdjust = viewModel::timerAdjust,
                     onStartPause = viewModel::timerStartPause,
@@ -954,11 +956,13 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                         }
                     },
                     actions = {
-                        TurnTimerChip(
-                            timerMs = viewModel.timerMs.value,
-                            timerRunning = viewModel.timerRunning.value,
-                            onExpand = { timerExpanded = true },
-                        )
+                        if (game.showTimer) {
+                            TurnTimerChip(
+                                timerMs = viewModel.timerMs.value,
+                                timerRunning = viewModel.timerRunning.value,
+                                onExpand = { timerExpanded = true },
+                            )
+                        }
                         IconButton(onClick = { viewModel.go(AppScreen.Settings) }) {
                             Icon(
                                 Icons.Default.Settings,
@@ -2298,10 +2302,23 @@ private fun TurnTimerChip(
     timerRunning: Boolean,
     onExpand: () -> Unit,
 ) {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = if (timerRunning) MaterialTheme.colorScheme.primaryContainer
+    // Expressive tonal treatment: the pill blooms to the primary container
+    // while running, back to neutral when paused — animated, not snapped.
+    val chipColor by animateColorAsState(
+        targetValue = if (timerRunning) MaterialTheme.colorScheme.primaryContainer
         else MaterialTheme.colorScheme.surfaceVariant,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = 380f),
+        label = "timerChip",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (timerRunning) MaterialTheme.colorScheme.onPrimaryContainer
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(250),
+        label = "timerChipContent",
+    )
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        color = chipColor,
         modifier = Modifier
             .height(30.dp)
             .clickable(onClick = onExpand),
@@ -2309,22 +2326,20 @@ private fun TurnTimerChip(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
-            modifier = Modifier.padding(horizontal = 10.dp),
+            modifier = Modifier.padding(horizontal = 12.dp),
         ) {
             Icon(
                 Icons.Default.Timer,
                 contentDescription = "Turn timer",
                 modifier = Modifier.size(15.dp),
-                tint = if (timerRunning) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = contentColor,
             )
             Text(
                 formatTimer(timerMs),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 style = TextStyle(fontFeatureSettings = "tnum"),
-                color = if (timerRunning) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = contentColor,
             )
         }
     }
@@ -2337,6 +2352,7 @@ private fun TurnTimerChip(
 @Composable
 internal fun TurnTimerBar(
     timerMs: Long,
+    timerSetMs: Long,
     timerRunning: Boolean,
     onAdjust: (Int) -> Unit,
     onStartPause: () -> Unit,
@@ -2412,17 +2428,27 @@ internal fun TurnTimerBar(
                     )
                 }
             }
-            // While running the bar keeps a colored rail so the expanded
-            // state reads as live even in the corner of your eye.
+            // While running the bar keeps a progress rail that literally
+            // counts down: it drains from full to empty across the armed
+            // duration, capped on the right if ±15s pushed past the set time.
+            val fraction = if (timerSetMs > 0L)
+                (timerMs.toFloat() / timerSetMs.toFloat()).coerceIn(0f, 1f) else 0f
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(3.dp)
-                    .background(
-                        color = if (timerRunning) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceVariant,
-                    ),
-            )
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(fraction)
+                        .height(3.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = RoundedCornerShape(topEnd = 2.dp, bottomEnd = 2.dp),
+                        ),
+                )
+            }
         }
     }
 }

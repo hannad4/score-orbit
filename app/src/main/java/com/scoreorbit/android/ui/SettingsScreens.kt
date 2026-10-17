@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.PlusOne
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
@@ -373,37 +374,63 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                                 if (!focus.isFocused) commitTarget()
                             },
                     )
-                }
-
-                SettingsGroup(label = "Turn Timer") {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        Text(
-                            "Default duration",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        val timerPresets = listOf(60, 120, 180, 300, 600, 900)
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            timerPresets.forEachIndexed { i, sec ->
-                                SegmentedButton(
-                                    selected = game.timerStartSec == sec,
-                                    onClick = { viewModel.setTimerStartSec(sec) },
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = i,
-                                        count = timerPresets.size,
-                                    ),
-                                ) {
-                                    Text(if (sec % 60 == 0) "${sec / 60}m" else "${sec}s")
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    ListItem(
+                        headlineContent = { Text("Turn Timer") },
+                        supportingContent = { Text("Countdown pill on the board's top bar") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Timer,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = game.showTimer,
+                                onCheckedChange = { viewModel.setShowTimer(it) },
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
+                    AnimatedVisibility(
+                        visible = game.showTimer,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically(),
+                    ) {
+                        // Duration presets, haptics-style: the segments pick
+                        // what the board's timer arms to (and what Reset
+                        // restores). The board itself nudges the countdown
+                        // by 15 seconds once a game is underway.
+                        val timerPresets = listOf(60, 120, 180, 300)
+                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                            Text(
+                                "Default Duration",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                timerPresets.forEachIndexed { i, sec ->
+                                    SegmentedButton(
+                                        selected = game.timerStartSec == sec,
+                                        onClick = { viewModel.setTimerStartSec(sec) },
+                                        shape = SegmentedButtonDefaults.itemShape(
+                                            index = i,
+                                            count = timerPresets.size,
+                                        ),
+                                    ) {
+                                        Text("${sec / 60}m")
+                                    }
                                 }
                             }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                "Tap the timer on the board to expand it — 15-second steps, start, pause and reset.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            "Tap the timer on the board to expand it — the steps there adjust the countdown by 15 seconds, with start, pause and reset.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                 }
 

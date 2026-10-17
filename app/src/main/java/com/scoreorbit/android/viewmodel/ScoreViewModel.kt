@@ -57,6 +57,10 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     private val _timerMs = mutableStateOf(120_000L)
     val timerMs: State<Long> = _timerMs
 
+    /** The armed duration: what the countdown drains from and Reset restores. */
+    private val _timerSetMs = mutableStateOf(120_000L)
+    val timerSetMs: State<Long> = _timerSetMs
+
     private val _timerRunning = mutableStateOf(false)
     val timerRunning: State<Boolean> = _timerRunning
 
@@ -79,6 +83,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             undoStack.addAll(saved.second)
             redoStack.addAll(saved.third)
             _timerMs.value = saved.first.timerStartSec * 1000L
+            _timerSetMs.value = saved.first.timerStartSec * 1000L
         } else {
             startNewGame(
                 playerCount = 2,
@@ -89,6 +94,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
                 winMetric = WinMetric.HIGHEST,
             )
             _timerMs.value = (_currentGame.value?.timerStartSec ?: 120) * 1000L
+            _timerSetMs.value = _timerMs.value
         }
     }
 
@@ -149,6 +155,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         timerEndAt = 0L
         _timerRunning.value = false
         _timerMs.value = (_currentGame.value?.timerStartSec ?: 120) * 1000L
+        _timerSetMs.value = _timerMs.value
         _screen.value = AppScreen.Board
         persist()
     }
@@ -247,23 +254,33 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         persist()
     }
 
-    // -- turn timer ----------------------------------------------------------
-    // Live state (remaining/running) is session state kept here, driven off
-    // a wall-clock deadline so it stays accurate across recompositions and
-    // process doze. Only the default duration travels with the game.
+    // -- turn timer control ---------------------------------------------------
+    // Driven off a wall-clock deadline so it stays accurate across
+    // recompositions and process doze. `timerSetMs` is the duration the
+    // user armed (settings default until they change it on the board):
+    // the countdown drains from it, and Reset returns to it. Only the
+    // default travels with the game.
 
     fun timerAdjust(deltaSec: Int) {
         val game = _currentGame.value ?: return
-        val newSec = (_timerMs.value / 1000L + deltaSec)
-            .coerceIn(15L, (game.timerStartSec.coerceAtLeast(15) * 4).toLong().coerceAtLeast(60L))
-        _timerMs.value = newSec * 1000L
-        // While running, adjusting shifts the deadline rather than pausing.
-        if (_timerRunning.value) timerEndAt = System.currentTimeMillis() + newSec * 1000L
+        if (_timerRunning.value) {
+            // Running: shifts the deadline only; the armed duration is
+            // untouched, so Reset still restores what the user chose.
+            val newSec = (_timerMs.value / 1000L + deltaSec).coerceAtLeast(15L)
+            _timerMs.value = newSec * 1000L
+            timerEndAt = System.currentTimeMillis() + newSec * 1000L
+        } else {
+            // Stopped: re-arming. This becomes the duration Start uses and
+            // the one Reset eventually returns to.
+            val newSec = (_timerSetMs.value / 1000L + deltaSec)
+                .coerceIn(15L, 3600L)
+            _timerSetMs.value = newSec * 1000L
+            _timerMs.value = newSec * 1000L
+        }
         _timerDoneTick.value = 0
     }
 
     fun timerStartPause() {
-        val game = _currentGame.value ?: return
         if (_timerRunning.value) {
             _timerRunning.value = false
             timerJob?.cancel()
@@ -271,9 +288,9 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             timerEndAt = 0L
             _timerDoneTick.value = 0
         } else {
-            // Off the zero-done state, Start restarts from the shown duration;
-            // Reset does the same for a stopped timer.
-            if (_timerMs.value <= 0L) _timerMs.value = game.timerStartSec * 1000L
+            // Off the zero-done state, Start restarts from the armed
+            // duration; Reset does the same for a stopped timer.
+            if (_timerMs.value <= 0L) _timerMs.value = _timerSetMs.value
             timerEndAt = System.currentTimeMillis() + _timerMs.value
             _timerRunning.value = true
             timerJob = viewModelScope.launch {
@@ -293,19 +310,33 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun timerReset() {
-        val game = _currentGame.value ?: return
         timerJob?.cancel()
         timerJob = null
         timerEndAt = 0L
         _timerRunning.value = false
-        _timerMs.value = game.timerStartSec * 1000L
+        _timerMs.value = _timerSetMs.value
         _timerDoneTick.value = 0
     }
 
-    /** Settings: default duration the timer starts from (and resets to). */
+    /** Settings: default duration the timer arms itself to (in seconds). */
     fun setTimerStartSec(sec: Int) {
         _currentGame.value = _currentGame.value?.copy(timerStartSec = sec.coerceIn(15, 3600))
-        timerReset()
+        timerJob?.cancel()
+        timerJob = null
+        timerEndAt = 0L
+        _timerRunning.value = false
+        _timerSetMs.value = sec * 1000L
+        _timerMs.value = sec * 1000L
+        _timerDoneTick.value = 0
+        persist()
+    }
+
+    /** Settings: whether the timer pill is offered on the board's top bar. */
+    fun setShowTimer(show: Boolean) {
+        _currentGame.value = _currentGame.value?.copy(showTimer = show)
+        if (!show) timerReset()
+        _timerSetMs.value = (_currentGame.value?.timerStartSec ?: 120) * 1000L
+        _timerMs.value = _timerSetMs.value
         persist()
     }
 
@@ -551,6 +582,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         .put("showRankBadges", game.showRankBadges)
         .put("hapticsEnabled", game.hapticsEnabled)
         .put("hapticStrength", game.hapticStrength)
+        .put("showTimer", game.showTimer)
         .put("timerStartSec", game.timerStartSec)
         .put("players", JSONArray(game.players.map { p ->
             JSONObject()
@@ -608,6 +640,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             showRankBadges = o.optBoolean("showRankBadges", true),
             hapticsEnabled = o.optBoolean("hapticsEnabled", false),
             hapticStrength = o.optInt("hapticStrength", 65),
+            showTimer = o.optBoolean("showTimer", true),
             timerStartSec = o.optInt("timerStartSec", 120).coerceIn(15, 3600),
             entries = entries.filter { it.playerId in ids },
         )

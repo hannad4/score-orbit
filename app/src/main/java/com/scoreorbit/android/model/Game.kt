@@ -51,6 +51,8 @@ data class Game(
     val showPlayerNames: Boolean = true,
     val hapticsEnabled: Boolean = false,
     val hapticStrength: Int = 65,
+    /** Whether the turn timer pill is offered on the board's top bar. */
+    val showTimer: Boolean = true,
     /** Default turn-timer duration the board starts from, in seconds. */
     val timerStartSec: Int = 120,
     val entries: List<ScoreEntry> = emptyList(),

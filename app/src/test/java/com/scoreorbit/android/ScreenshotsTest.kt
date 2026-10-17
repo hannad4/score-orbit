@@ -123,6 +123,7 @@ class ScreenshotsTest {
             ScoreOrbitTheme(dynamicColor = false) {
                 TurnTimerBar(
                     timerMs = 75_000L,
+                    timerSetMs = 120_000L,
                     timerRunning = true,
                     onAdjust = {},
                     onStartPause = {},
