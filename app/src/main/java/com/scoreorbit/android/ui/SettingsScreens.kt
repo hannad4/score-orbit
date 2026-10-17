@@ -375,6 +375,38 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel) {
                     )
                 }
 
+                SettingsGroup(label = "Turn Timer") {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(
+                            "Default duration",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val timerPresets = listOf(60, 120, 180, 300, 600, 900)
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            timerPresets.forEachIndexed { i, sec ->
+                                SegmentedButton(
+                                    selected = game.timerStartSec == sec,
+                                    onClick = { viewModel.setTimerStartSec(sec) },
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = i,
+                                        count = timerPresets.size,
+                                    ),
+                                ) {
+                                    Text(if (sec % 60 == 0) "${sec / 60}m" else "${sec}s")
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            "Tap the timer on the board to expand it — the steps there adjust the countdown by 15 seconds, with start, pause and reset.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
                 SettingsGroup(label = "Board View") {
                     ListItem(
                         headlineContent = { Text("Show Player Names") },

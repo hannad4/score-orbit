@@ -14,6 +14,7 @@ import com.scoreorbit.android.ui.LeaderboardScreen
 import com.scoreorbit.android.ui.PlayerSetupScreen
 import com.scoreorbit.android.ui.ScoreHistoryScreen
 import com.scoreorbit.android.ui.ScoreboardScreen
+import com.scoreorbit.android.ui.TurnTimerBar
 import com.scoreorbit.android.ui.SettingsScreen
 import com.scoreorbit.android.ui.theme.ScoreOrbitColors
 import com.scoreorbit.android.ui.theme.ScoreOrbitTheme
@@ -60,6 +61,9 @@ class ScreenshotsTest {
         Mockito.`when`(vm.undoStack).thenReturn(mutableStateListOf(*undo))
         Mockito.`when`(vm.redoStack).thenReturn(mutableStateListOf())
         Mockito.`when`(vm.themeMode).thenReturn(mutableStateOf(ThemeMode.SYSTEM))
+        Mockito.`when`(vm.timerMs).thenReturn(mutableStateOf(120_000L))
+        Mockito.`when`(vm.timerRunning).thenReturn(mutableStateOf(false))
+        Mockito.`when`(vm.timerDoneTick).thenReturn(mutableStateOf(0))
         return vm
     }
 
@@ -109,6 +113,22 @@ class ScreenshotsTest {
         paparazzi.snapshot {
             ScoreOrbitTheme(dynamicColor = false) {
                 LeaderboardScreen(game = game, viewModel = stubViewModel())
+            }
+        }
+    }
+
+    @Test
+    fun timerBar() {
+        paparazzi.snapshot {
+            ScoreOrbitTheme(dynamicColor = false) {
+                TurnTimerBar(
+                    timerMs = 75_000L,
+                    timerRunning = true,
+                    onAdjust = {},
+                    onStartPause = {},
+                    onReset = {},
+                    onCollapse = {},
+                )
             }
         }
     }

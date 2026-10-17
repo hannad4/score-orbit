@@ -29,12 +29,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Leaderboard
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -44,6 +54,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -75,7 +86,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -747,6 +761,18 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     // teardown recover fully under any ordering.
     var swapEngaged by remember(game.id) { mutableStateOf(false) }
     var swapEndTime by remember(game.id) { mutableStateOf(0L) }
+    // Turn timer: collapsed chip in the top bar expands into a full-width
+    // timer strip (same real estate, no overlay over the board).
+    var timerExpanded by remember { mutableStateOf(false) }
+    // Timer expiry bump: one long pulse per completion, only when haptics
+    // are enabled for the overall board.
+    val hapticFeedback = LocalHapticFeedback.current
+    val timerDoneTick = viewModel.timerDoneTick.value
+    LaunchedEffect(timerDoneTick) {
+        if (timerDoneTick > 0 && game.hapticsEnabled) {
+            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
     // Restart-proof drag tracking (see SeatDragState).
     val seatDrag = remember(game.id) { SeatDragState() }
     // Seat fingerprint for the dial detector keys (order changes it,
@@ -889,44 +915,60 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    if (game.name.isNotBlank()) {
-                        Text(
-                            game.name,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+            if (timerExpanded) {
+                TurnTimerBar(
+                    timerMs = viewModel.timerMs.value,
+                    timerRunning = viewModel.timerRunning.value,
+                    onAdjust = viewModel::timerAdjust,
+                    onStartPause = viewModel::timerStartPause,
+                    onReset = viewModel::timerReset,
+                    onCollapse = { timerExpanded = false },
+                )
+            } else {
+                CenterAlignedTopAppBar(
+                    title = {
+                        if (game.name.isNotBlank()) {
+                            Text(
+                                game.name,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { viewModel.go(AppScreen.ScoreHistory) }) {
+                                Icon(
+                                    Icons.Default.History,
+                                    contentDescription = "Score history",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                )
+                            }
+                            IconButton(onClick = { viewModel.go(AppScreen.Leaderboard) }) {
+                                Icon(
+                                    Icons.Default.Leaderboard,
+                                    contentDescription = "Leaderboard",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                )
+                            }
+                        }
+                    },
+                    actions = {
+                        TurnTimerChip(
+                            timerMs = viewModel.timerMs.value,
+                            timerRunning = viewModel.timerRunning.value,
+                            onExpand = { timerExpanded = true },
                         )
-                    }
-                },
-                navigationIcon = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { viewModel.go(AppScreen.ScoreHistory) }) {
+                        IconButton(onClick = { viewModel.go(AppScreen.Settings) }) {
                             Icon(
-                                Icons.Default.History,
-                                contentDescription = "Score history",
+                                Icons.Default.Settings,
+                                contentDescription = "Settings",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             )
                         }
-                        IconButton(onClick = { viewModel.go(AppScreen.Leaderboard) }) {
-                            Icon(
-                                Icons.Default.Leaderboard,
-                                contentDescription = "Leaderboard",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.go(AppScreen.Settings) }) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        )
-                    }
-                },
-            )
+                    },
+                )
+            }
         },
     ) { innerPadding ->
         BoxWithConstraints(
@@ -2234,6 +2276,153 @@ private fun SeatScore(
                 )
             }
         }
+        }
+    }
+}
+
+// -- turn timer ---------------------------------------------------------------
+
+/**
+ * m:ss readout, rounding up so the clock shows the second the player still
+ * has (a quarter-second left reads 0:01, expiry reads 0:00 exactly).
+ */
+internal fun formatTimer(ms: Long): String {
+    val sec = ((ms + 999L) / 1000L).toInt().coerceAtLeast(0)
+    return "%d:%02d".format(sec / 60, sec % 60)
+}
+
+/** Collapsed state: compact pill in the top bar, leading the settings button. */
+@Composable
+private fun TurnTimerChip(
+    timerMs: Long,
+    timerRunning: Boolean,
+    onExpand: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = if (timerRunning) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier
+            .height(30.dp)
+            .clickable(onClick = onExpand),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier.padding(horizontal = 10.dp),
+        ) {
+            Icon(
+                Icons.Default.Timer,
+                contentDescription = "Turn timer",
+                modifier = Modifier.size(15.dp),
+                tint = if (timerRunning) MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                formatTimer(timerMs),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                style = TextStyle(fontFeatureSettings = "tnum"),
+                color = if (timerRunning) MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Expanded state: the timer takes over the whole top bar. Controls sit in
+ * user order — collapse, −, the clock, +, then pause/start and reset.
+ */
+@Composable
+internal fun TurnTimerBar(
+    timerMs: Long,
+    timerRunning: Boolean,
+    onAdjust: (Int) -> Unit,
+    onStartPause: () -> Unit,
+    onReset: () -> Unit,
+    onCollapse: () -> Unit,
+) {
+    Surface(color = MaterialTheme.colorScheme.surface) {
+        Column(
+            Modifier
+                .windowInsetsPadding(WindowInsets.statusBars)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .padding(horizontal = 4.dp),
+            ) {
+                IconButton(onClick = onCollapse) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Minimize timer",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                // The adjusting pair brackets the clock exactly as specified:
+                // minus on the left, plus on the right, both ±15 seconds.
+                IconButton(
+                    onClick = { onAdjust(-15) },
+                    enabled = !timerRunning || timerMs > 15_000L,
+                ) {
+                    Icon(Icons.Default.Remove, contentDescription = "Subtract 15 seconds")
+                }
+                Text(
+                    formatTimer(timerMs),
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    style = TextStyle(fontFeatureSettings = "tnum"),
+                    color = when {
+                        timerMs <= 0L -> MaterialTheme.colorScheme.error
+                        timerRunning -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                IconButton(onClick = { onAdjust(15) }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add 15 seconds")
+                }
+                Spacer(Modifier.weight(1f))
+                IconButton(
+                    onClick = onStartPause,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (timerRunning) MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.primaryContainer,
+                        ),
+                ) {
+                    Icon(
+                        if (timerRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (timerRunning) "Pause timer" else "Start timer",
+                        tint = if (timerRunning) MaterialTheme.colorScheme.onSecondaryContainer
+                        else MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+                IconButton(onClick = onReset) {
+                    Icon(
+                        Icons.Default.Replay,
+                        contentDescription = "Reset timer",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    )
+                }
+            }
+            // While running the bar keeps a colored rail so the expanded
+            // state reads as live even in the corner of your eye.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .background(
+                        color = if (timerRunning) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+            )
         }
     }
 }
