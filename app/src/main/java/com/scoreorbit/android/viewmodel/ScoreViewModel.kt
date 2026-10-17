@@ -15,12 +15,15 @@ import com.scoreorbit.android.model.Team
 import com.scoreorbit.android.model.WinMetric
 import com.scoreorbit.android.ui.theme.ScoreOrbitColors
 import com.scoreorbit.android.ui.buzz
-import android.media.AudioManager
-import android.media.ToneGenerator
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
+import kotlinx.coroutines.Dispatchers
 import com.scoreorbit.android.util.RotationUtils
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
@@ -358,26 +361,83 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Time's up: the timer rings like a proper alarm — a double-beep plus a
-     * heavy multi-pulse buzz at the board's haptic strength, repeating every
-     * couple of seconds until the user acknowledges it (start, reset, or
-     * tapping the timer itself).
+     * Time's up: rings like a proper alarm — a burst of three clean sine
+     * pips (classic kitchen-timer sound, streamed on the alarm volume so
+     * it respects the device's alarm level) plus a solid buzz, repeating
+     * on a short cadence until the user acknowledges it.
      */
     private fun startAlarm() {
         stopAlarm()
         _timerRinging.value = true
-        alarmJob = viewModelScope.launch {
-            // Small lead so the 0:00 reads out before the first beep.
-            delay(350)
-            while (true) {
-                runCatching {
-                    val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
-                    tone.startTone(ToneGenerator.TONE_PROP_BEEP2, 700)
-                    delay(900)
-                    tone.release()
+        alarmJob = viewModelScope.launch(Dispatchers.IO) {
+            val rate = 16_000
+            val pipMs = 300
+            val gapMs = 140
+            val pips = 3
+            // Full burst: pip, gap, pip, gap, pip (leading edge dampened to
+            // avoid the click a raw square wave would make).
+            val burst = ShortArray(rate * (pipMs * pips + gapMs * (pips - 1)) / 1000)
+            var i = 0
+            repeat(pips) { p ->
+                val n = rate * pipMs / 1000
+                val ramp = (rate * 0.014).toInt()
+                for (k in 0 until n) {
+                    val env = when {
+                        k < ramp -> k / ramp.toFloat()
+                        k > n - ramp -> (n - k) / ramp.toFloat()
+                        else -> 1f
+                    }
+                    val s = kotlin.math.sin(2.0 * kotlin.math.PI * 1760.0 * k / rate)
+                    burst[i + k] = (s.toFloat() * env * 0.5f * Short.MAX_VALUE).toInt().toShort()
                 }
-                buzz(getApplication(), 400L, _currentGame.value?.hapticStrength ?: 65)
-                delay(2400)
+                i += n
+                if (p < pips - 1) i += rate * gapMs / 1000
+            }
+            var track: AudioTrack? = null
+            try {
+                val minBuf = AudioTrack.getMinBufferSize(
+                    rate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                ).coerceAtLeast(rate)
+                track = AudioTrack.Builder()
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setSampleRate(rate)
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .build()
+                    )
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .setBufferSizeInBytes(minBuf)
+                    .build()
+                alarmTrack = track
+                track.play()
+                delay(350)
+                var off = 0
+                while (isActive) {
+                    // Stream the burst; writes park until the buffer drains.
+                    while (off < burst.size && isActive) {
+                        off += track.write(burst, off, burst.size - off)
+                    }
+                    // Firm double buzz rides along with the beep train.
+                    buzz(getApplication(), 350L, _currentGame.value?.hapticStrength ?: 65)
+                    if (!isActive) break
+                    // Short cadence: back on the clocks in ~1s.
+                    off = 0
+                    delay(1000)
+                }
+            } catch (_: Exception) {
+            } finally {
+                runCatching { track?.stop() }
+                runCatching { track?.release() }
+                alarmTrack = null
             }
         }
     }
@@ -388,8 +448,11 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             alarmJob?.cancel()
             alarmJob = null
             _timerRinging.value = false
+            // Cutting the track stops the in-flight write; its loops unwind.
+            runCatching { alarmTrack?.pause() }
         }
     }
+    private var alarmTrack: AudioTrack? = null
 
     fun setKeepLastVisible(keep: Boolean) {
         _currentGame.value = _currentGame.value?.copy(keepLastVisible = keep)
