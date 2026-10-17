@@ -63,6 +63,7 @@ class ScreenshotsTest {
         Mockito.`when`(vm.themeMode).thenReturn(mutableStateOf(ThemeMode.SYSTEM))
         Mockito.`when`(vm.timerMs).thenReturn(mutableStateOf(120_000L))
         Mockito.`when`(vm.timerRunning).thenReturn(mutableStateOf(false))
+        Mockito.`when`(vm.timerRinging).thenReturn(mutableStateOf(false))
         Mockito.`when`(vm.timerDoneTick).thenReturn(mutableStateOf(0))
         return vm
     }
@@ -125,10 +126,12 @@ class ScreenshotsTest {
                     timerMs = 75_000L,
                     timerSetMs = 120_000L,
                     timerRunning = true,
+                    timerRinging = false,
                     onAdjust = {},
                     onStartPause = {},
                     onReset = {},
                     onCollapse = {},
+                    onSilence = {},
                 )
             }
         }

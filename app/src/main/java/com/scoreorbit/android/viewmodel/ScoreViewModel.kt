@@ -12,7 +12,6 @@ import com.scoreorbit.android.model.Player
 import com.scoreorbit.android.model.Rotation
 import com.scoreorbit.android.model.ScoreEntry
 import com.scoreorbit.android.model.Team
-import com.scoreorbit.android.model.TimerAlert
 import com.scoreorbit.android.model.WinMetric
 import com.scoreorbit.android.ui.theme.ScoreOrbitColors
 import com.scoreorbit.android.ui.buzz
@@ -74,6 +73,11 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
 
     private var timerEndAt = 0L
     private var timerJob: Job? = null
+
+    /** True while the expired-time alarm is ringing; consumes for UI pulse. */
+    private val _timerRinging = mutableStateOf(false)
+    val timerRinging: State<Boolean> = _timerRinging
+    private var alarmJob: Job? = null
 
     val undoStack = mutableStateListOf<ScoreEntry>()
     val redoStack = mutableStateListOf<ScoreEntry>()
@@ -154,6 +158,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         undoStack.clear()
         redoStack.clear()
         // New board: timer shall go back to its fresh, default duration.
+        stopAlarm()
         timerJob?.cancel()
         timerJob = null
         timerEndAt = 0L
@@ -285,6 +290,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun timerStartPause() {
+        stopAlarm()
         if (_timerRunning.value) {
             _timerRunning.value = false
             timerJob?.cancel()
@@ -304,7 +310,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
                         _timerMs.value = 0L
                         _timerRunning.value = false
                         _timerDoneTick.value += 1
-                        fireTimerAlert()
+                        startAlarm()
                         break
                     }
                     _timerMs.value = left
@@ -315,6 +321,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun timerReset() {
+        stopAlarm()
         timerJob?.cancel()
         timerJob = null
         timerEndAt = 0L
@@ -328,6 +335,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         _currentGame.value = _currentGame.value?.copy(timerStartSec = sec.coerceIn(15, 3600))
         timerJob?.cancel()
         timerJob = null
+        stopAlarm()
         timerEndAt = 0L
         _timerRunning.value = false
         _timerSetMs.value = sec * 1000L
@@ -339,40 +347,47 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     /** Settings: whether the timer pill is offered on the board's top bar. */
     fun setShowTimer(show: Boolean) {
         _currentGame.value = _currentGame.value?.copy(showTimer = show)
-        if (!show) timerReset()
+        if (!show) {
+            timerReset()
+        } else {
+            stopAlarm()
+        }
         _timerSetMs.value = (_currentGame.value?.timerStartSec ?: 120) * 1000L
         _timerMs.value = _timerSetMs.value
         persist()
     }
 
-    /** Settings: what plays when the timer reaches zero. */
-    fun setTimerAlert(mode: TimerAlert) {
-        _currentGame.value = _currentGame.value?.copy(timerAlert = mode)
-        persist()
-    }
-
     /**
-     * Time's up flourish: a solid double-beep and/or a heavy multi-pulse
-     * buzz at the board's configured haptic strength. Delayed until the
-     * 0:00 reads out first, so nothing talks over the display.
+     * Time's up: the timer rings like a proper alarm — a double-beep plus a
+     * heavy multi-pulse buzz at the board's haptic strength, repeating every
+     * couple of seconds until the user acknowledges it (start, reset, or
+     * tapping the timer itself).
      */
-    private fun fireTimerAlert() {
-        val game = _currentGame.value ?: return
-        val mode = game.timerAlert
-        if (mode == TimerAlert.OFF) return
-        viewModelScope.launch {
-            delay(300)
-            if (mode == TimerAlert.SOUND || mode == TimerAlert.BOTH) {
+    private fun startAlarm() {
+        stopAlarm()
+        _timerRinging.value = true
+        alarmJob = viewModelScope.launch {
+            // Small lead so the 0:00 reads out before the first beep.
+            delay(350)
+            while (true) {
                 runCatching {
-                    val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 80)
+                    val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
                     tone.startTone(ToneGenerator.TONE_PROP_BEEP2, 700)
                     delay(900)
                     tone.release()
                 }
+                buzz(getApplication(), 400L, _currentGame.value?.hapticStrength ?: 65)
+                delay(2400)
             }
-            if (mode == TimerAlert.VIBRATE || mode == TimerAlert.BOTH) {
-                buzz(getApplication(), 400L, game.hapticStrength)
-            }
+        }
+    }
+
+    /** Silence the alarm; idempotent so every teardown path can call it. */
+    fun stopAlarm() {
+        if (alarmJob != null || _timerRinging.value) {
+            alarmJob?.cancel()
+            alarmJob = null
+            _timerRinging.value = false
         }
     }
 
@@ -619,7 +634,6 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         .put("hapticsEnabled", game.hapticsEnabled)
         .put("hapticStrength", game.hapticStrength)
         .put("showTimer", game.showTimer)
-        .put("timerAlert", game.timerAlert.name)
         .put("timerStartSec", game.timerStartSec)
         .put("players", JSONArray(game.players.map { p ->
             JSONObject()
@@ -678,8 +692,6 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             hapticsEnabled = o.optBoolean("hapticsEnabled", false),
             hapticStrength = o.optInt("hapticStrength", 65),
             showTimer = o.optBoolean("showTimer", true),
-            timerAlert = runCatching { TimerAlert.valueOf(o.getString("timerAlert")) }
-                .getOrDefault(TimerAlert.BOTH),
             timerStartSec = o.optInt("timerStartSec", 120).coerceIn(15, 3600),
             entries = entries.filter { it.playerId in ids },
         )

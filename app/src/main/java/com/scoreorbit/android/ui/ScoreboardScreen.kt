@@ -1,10 +1,14 @@
 package com.scoreorbit.android.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.animateIntOffsetAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -45,6 +49,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -910,10 +915,15 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                     timerMs = viewModel.timerMs.value,
                     timerSetMs = viewModel.timerSetMs.value,
                     timerRunning = viewModel.timerRunning.value,
+                    timerRinging = viewModel.timerRinging.value,
                     onAdjust = viewModel::timerAdjust,
                     onStartPause = viewModel::timerStartPause,
                     onReset = viewModel::timerReset,
-                    onCollapse = { timerExpanded = false },
+                    onCollapse = {
+                        viewModel.stopAlarm()
+                        timerExpanded = false
+                    },
+                    onSilence = viewModel::stopAlarm,
                 )
             } else {
                 CenterAlignedTopAppBar(
@@ -949,7 +959,11 @@ fun ScoreboardScreen(game: Game, viewModel: ScoreViewModel) {
                             TurnTimerChip(
                                 timerMs = viewModel.timerMs.value,
                                 timerRunning = viewModel.timerRunning.value,
-                                onExpand = { timerExpanded = true },
+                                timerRinging = viewModel.timerRinging.value,
+                                onExpand = {
+                                    viewModel.stopAlarm()
+                                    timerExpanded = true
+                                },
                             )
                         }
                         IconButton(onClick = { viewModel.go(AppScreen.Settings) }) {
@@ -2284,32 +2298,52 @@ internal fun formatTimer(ms: Long): String {
     return "%d:%02d".format(sec / 60, sec % 60)
 }
 
-/** Collapsed state: compact pill in the top bar, leading the settings button. */
+/** Collapsed state: compact pill in the top bar, leading the settings button.
+ *  Rings (pulses red) when the alarm is live; the first tap silences it too. */
 @Composable
 private fun TurnTimerChip(
     timerMs: Long,
     timerRunning: Boolean,
+    timerRinging: Boolean,
     onExpand: () -> Unit,
 ) {
     // Expressive tonal treatment: the pill blooms to the primary container
     // while running, back to neutral when paused — animated, not snapped.
     val chipColor by animateColorAsState(
-        targetValue = if (timerRunning) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceVariant,
+        targetValue = when {
+            timerRinging -> MaterialTheme.colorScheme.errorContainer
+            timerRunning -> MaterialTheme.colorScheme.primaryContainer
+            else -> MaterialTheme.colorScheme.surfaceVariant
+        },
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = 380f),
         label = "timerChip",
     )
     val contentColor by animateColorAsState(
-        targetValue = if (timerRunning) MaterialTheme.colorScheme.onPrimaryContainer
-        else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = when {
+            timerRinging -> MaterialTheme.colorScheme.onErrorContainer
+            timerRunning -> MaterialTheme.colorScheme.onPrimaryContainer
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
         animationSpec = tween(250),
         label = "timerChipContent",
+    )
+    // Alarm attention: the pill throbs until acknowledged.
+    val pulse = rememberInfiniteTransition(label = "ring")
+    val ringAlpha by pulse.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.55f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(340),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "ringAlpha",
     )
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
         color = chipColor,
         modifier = Modifier
             .height(30.dp)
+            .alpha(if (timerRinging) ringAlpha else 1f)
             .clickable(onClick = onExpand),
     ) {
         Row(
@@ -2343,11 +2377,24 @@ internal fun TurnTimerBar(
     timerMs: Long,
     timerSetMs: Long,
     timerRunning: Boolean,
+    timerRinging: Boolean,
     onAdjust: (Int) -> Unit,
     onStartPause: () -> Unit,
     onReset: () -> Unit,
     onCollapse: () -> Unit,
+    onSilence: () -> Unit,
 ) {
+    // Alarm attention: the clock throbs until the alarm is silenced.
+    val pulse = rememberInfiniteTransition(label = "ring")
+    val ringAlpha by pulse.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.45f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(340),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "ringAlpha",
+    )
     Surface(color = MaterialTheme.colorScheme.surface) {
         Column(
             Modifier
@@ -2382,30 +2429,43 @@ internal fun TurnTimerBar(
                     fontWeight = FontWeight.Bold,
                     style = TextStyle(fontFeatureSettings = "tnum"),
                     color = when {
+                        timerRinging -> MaterialTheme.colorScheme.error
                         timerMs <= 0L -> MaterialTheme.colorScheme.error
                         timerRunning -> MaterialTheme.colorScheme.primary
                         else -> MaterialTheme.colorScheme.onSurface
                     },
-                    modifier = Modifier.padding(horizontal = 8.dp),
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .alpha(if (timerRinging) ringAlpha else 1f),
                 )
                 IconButton(onClick = { onAdjust(15) }) {
                     Icon(Icons.Default.Add, contentDescription = "Add 15 seconds")
                 }
                 Spacer(Modifier.weight(1f))
+                // When the alarm is ringing, this becomes the stop button:
+                // silence without restarting. Otherwise start/pause.
                 IconButton(
-                    onClick = onStartPause,
+                    onClick = if (timerRinging) onSilence else onStartPause,
                     modifier = Modifier
                         .size(44.dp)
                         .clip(CircleShape)
                         .background(
-                            if (timerRunning) MaterialTheme.colorScheme.secondaryContainer
+                            if (!timerRinging && timerRunning) MaterialTheme.colorScheme.secondaryContainer
                             else MaterialTheme.colorScheme.primaryContainer,
                         ),
                 ) {
                     Icon(
-                        if (timerRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (timerRunning) "Pause timer" else "Start timer",
-                        tint = if (timerRunning) MaterialTheme.colorScheme.onSecondaryContainer
+                        when {
+                            timerRinging -> Icons.Default.Stop
+                            timerRunning -> Icons.Default.Pause
+                            else -> Icons.Default.PlayArrow
+                        },
+                        contentDescription = when {
+                            timerRinging -> "Silence alarm"
+                            timerRunning -> "Pause timer"
+                            else -> "Start timer"
+                        },
+                        tint = if (!timerRinging && timerRunning) MaterialTheme.colorScheme.onSecondaryContainer
                         else MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
