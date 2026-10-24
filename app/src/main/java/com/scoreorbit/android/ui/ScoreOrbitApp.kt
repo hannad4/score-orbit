@@ -55,8 +55,13 @@ fun ScoreOrbitApp(viewModel: ScoreViewModel) {
             when (target) {
                 AppScreen.Board -> {
                     val g = game
-                    if (g != null) ScoreboardScreen(game = g, viewModel = viewModel)
-                    else SettingsScreen(game = null, viewModel = viewModel)
+                    when {
+                        // First run: the setup wizard fronts the board.
+                        g != null && !g.onboarded ->
+                            OnboardingScreen(game = g, viewModel = viewModel)
+                        g != null -> ScoreboardScreen(game = g, viewModel = viewModel)
+                        else -> SettingsScreen(game = null, viewModel = viewModel)
+                    }
                 }
                 AppScreen.Settings -> SettingsScreen(game = game, viewModel = viewModel)
                 AppScreen.PlayerSetup -> {

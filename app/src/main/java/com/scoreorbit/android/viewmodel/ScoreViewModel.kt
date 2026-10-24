@@ -103,6 +103,8 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
                 rotationPoints = 10,
                 tapPoints = 0,
                 winMetric = WinMetric.HIGHEST,
+                // First install: the welcome wizard gets to set the table.
+                onboarded = false,
             )
             _timerMs.value = (_currentGame.value?.timerStartSec ?: 120) * 1000L
             _timerSetMs.value = _timerMs.value
@@ -132,6 +134,10 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         hapticStrength: Int = 65,
         teams: List<Team> = emptyList(),
         teamIds: List<String?> = emptyList(),
+        // Explicit "New Game" actions come from inside the app, so their
+        // boards skip the wizard; only a fresh install walks it (init
+        // passes false).
+        onboarded: Boolean = true,
     ) {
         val count = playerCount.coerceIn(1, 12)
         val players = (0 until count).map { i ->
@@ -157,6 +163,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             showPlayerNames = showPlayerNames,
             hapticsEnabled = hapticsEnabled,
             hapticStrength = hapticStrength,
+            onboarded = onboarded,
         )
         undoStack.clear()
         redoStack.clear()
@@ -192,6 +199,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             hapticStrength = game.hapticStrength,
             teams = game.teams,
             teamIds = game.players.map { it.teamId },
+            onboarded = game.onboarded,
         )
     }
 
@@ -613,6 +621,13 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         persist()
     }
 
+    /** First-run wizard finished: the board never shows it again. */
+    fun completeOnboarding() {
+        val game = _currentGame.value ?: return
+        _currentGame.value = game.copy(onboarded = true)
+        persist()
+    }
+
     fun assignPlayer(playerId: String, teamId: String?) {
         val game = _currentGame.value ?: return
         if (teamId != null && game.teams.none { it.id == teamId }) return
@@ -698,6 +713,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         .put("hapticStrength", game.hapticStrength)
         .put("showTimer", game.showTimer)
         .put("timerStartSec", game.timerStartSec)
+        .put("onboarded", game.onboarded)
         .put("players", JSONArray(game.players.map { p ->
             JSONObject()
                 .put("id", p.id)
@@ -756,6 +772,8 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             hapticStrength = o.optInt("hapticStrength", 65),
             showTimer = o.optBoolean("showTimer", true),
             timerStartSec = o.optInt("timerStartSec", 120).coerceIn(15, 3600),
+            // Games saved before the wizard existed count as walked through.
+            onboarded = o.optBoolean("onboarded", true),
             entries = entries.filter { it.playerId in ids },
         )
     }

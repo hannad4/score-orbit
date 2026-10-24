@@ -682,7 +682,7 @@ private fun SettingsGroup(label: String, content: @Composable () -> Unit) {
 
 /** Compact value-forward stepper: big number, steppers, one-line caption. */
 @Composable
-private fun StepperCell(
+internal fun StepperCell(
     value: String,
     caption: String,
     onMinus: () -> Unit,
@@ -731,7 +731,7 @@ private fun StepperCell(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HoldRepeatButton(
+internal fun HoldRepeatButton(
     onClick: () -> Unit,
     enabled: Boolean,
     content: @Composable () -> Unit,

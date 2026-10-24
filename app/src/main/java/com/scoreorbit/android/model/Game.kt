@@ -55,6 +55,8 @@ data class Game(
     val showTimer: Boolean = true,
     /** Default turn-timer duration the board starts from, in seconds. */
     val timerStartSec: Int = 120,
+    /** False until the first-run setup wizard has been walked through. */
+    val onboarded: Boolean = false,
     val entries: List<ScoreEntry> = emptyList(),
 ) {
     fun currentScore(playerId: String): Int {

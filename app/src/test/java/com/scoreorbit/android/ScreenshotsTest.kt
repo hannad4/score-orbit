@@ -11,6 +11,7 @@ import com.scoreorbit.android.model.ScoreEntry
 import com.scoreorbit.android.model.Team
 import com.scoreorbit.android.model.WinMetric
 import com.scoreorbit.android.ui.LeaderboardScreen
+import com.scoreorbit.android.ui.OnboardingScreen
 import com.scoreorbit.android.ui.PlayerSetupScreen
 import com.scoreorbit.android.ui.ScoreHistoryScreen
 import com.scoreorbit.android.ui.ScoreboardScreen
@@ -114,6 +115,26 @@ class ScreenshotsTest {
         paparazzi.snapshot {
             ScoreOrbitTheme(dynamicColor = false) {
                 LeaderboardScreen(game = game, viewModel = stubViewModel())
+            }
+        }
+    }
+
+    @Test
+    fun onboardingWelcome() {
+        val game = demoGame()
+        paparazzi.snapshot {
+            ScoreOrbitTheme(dynamicColor = false) {
+                OnboardingScreen(game = game, viewModel = stubViewModel(), initialPage = 0)
+            }
+        }
+    }
+
+    @Test
+    fun onboardingTableSetup() {
+        val game = demoGame()
+        paparazzi.snapshot {
+            ScoreOrbitTheme(dynamicColor = false) {
+                OnboardingScreen(game = game, viewModel = stubViewModel(), initialPage = 2)
             }
         }
     }
