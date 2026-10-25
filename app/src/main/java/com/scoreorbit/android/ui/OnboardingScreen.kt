@@ -261,8 +261,7 @@ private fun OrbitArt(modifier: Modifier = Modifier) {
 private fun WelcomePage(game: Game) {
     WizardPage(
         title = "Welcome to Score Orbit",
-        subtitle = "The scorekeeper that lives on the table \u2014 every player " +
-            "around one shared dial. Three quick steps and you're playing.",
+        subtitle = "Three short steps and you're playing.",
     ) {
         OrbitArt(modifier = Modifier.size(230.dp))
     }
