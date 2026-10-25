@@ -8,6 +8,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.scoreorbit.android.model.Game
+import com.scoreorbit.android.model.MAX_TIMER_SEC
+import com.scoreorbit.android.model.MIN_TIMER_SEC
 import com.scoreorbit.android.model.Player
 import com.scoreorbit.android.model.Rotation
 import com.scoreorbit.android.model.ScoreEntry
@@ -293,7 +295,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             // Stopped: re-arming. This becomes the duration Start uses and
             // the one Reset eventually returns to.
             val newSec = (_timerSetMs.value / 1000L + deltaSec)
-                .coerceIn(15L, 3600L)
+                .coerceIn(MIN_TIMER_SEC.toLong(), MAX_TIMER_SEC.toLong())
             _timerSetMs.value = newSec * 1000L
             _timerMs.value = newSec * 1000L
         }
@@ -343,7 +345,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Settings: default duration the timer arms itself to (in seconds). */
     fun setTimerStartSec(sec: Int) {
-        _currentGame.value = _currentGame.value?.copy(timerStartSec = sec.coerceIn(15, 3600))
+        _currentGame.value = _currentGame.value?.copy(timerStartSec = sec.coerceIn(MIN_TIMER_SEC, MAX_TIMER_SEC))
         timerJob?.cancel()
         timerJob = null
         stopAlarm()
@@ -771,7 +773,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
             hapticsEnabled = o.optBoolean("hapticsEnabled", false),
             hapticStrength = o.optInt("hapticStrength", 65),
             showTimer = o.optBoolean("showTimer", true),
-            timerStartSec = o.optInt("timerStartSec", 120).coerceIn(15, 3600),
+            timerStartSec = o.optInt("timerStartSec", 120).coerceIn(MIN_TIMER_SEC, MAX_TIMER_SEC),
             // Games saved before the wizard existed count as walked through.
             onboarded = o.optBoolean("onboarded", true),
             entries = entries.filter { it.playerId in ids },

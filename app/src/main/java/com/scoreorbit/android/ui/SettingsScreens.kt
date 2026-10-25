@@ -502,40 +502,13 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                         enter = fadeIn() + expandVertically(),
                         exit = fadeOut() + shrinkVertically(),
                     ) {
-                        // Duration presets, haptics-style: the segments pick
-                        // what the board's timer arms to (and what Reset
-                        // restores). Time's up is fixed at sound + vibration
-                        // (it rings until acknowledged) — no extra knob for
-                        // that, the page carries enough options already.
-                        val timerPresets = listOf(60, 120, 180, 300)
-                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                            Text(
-                                "Default Duration",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                                    timerPresets.forEachIndexed { i, sec ->
-                                        SegmentedButton(
-                                            selected = game.timerStartSec == sec,
-                                            onClick = { viewModel.setTimerStartSec(sec) },
-                                            shape = SegmentedButtonDefaults.itemShape(
-                                                index = i,
-                                                count = timerPresets.size,
-                                            ),
-                                        ) {
-                                            Text("${sec / 60}m")
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    "Tap the timer on the board to expand it — 15-second steps, start, pause and reset.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                        }
+                        // Time's up is fixed at sound + vibration (it rings
+                        // until acknowledged) — no extra knob for that, the
+                        // page carries enough options already.
+                        TimerDurationRow(
+                            seconds = game.timerStartSec,
+                            onChange = { viewModel.setTimerStartSec(it) },
+                        )
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(

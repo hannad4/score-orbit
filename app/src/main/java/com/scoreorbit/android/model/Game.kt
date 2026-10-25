@@ -1,5 +1,9 @@
 package com.scoreorbit.android.model
 
+/** Shortest and longest turn timer, in seconds (15s to 999:59). */
+const val MIN_TIMER_SEC = 15
+const val MAX_TIMER_SEC = 999 * 60 + 59
+
 data class Player(
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String = "Player",
