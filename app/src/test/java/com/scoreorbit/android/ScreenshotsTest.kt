@@ -130,11 +130,51 @@ class ScreenshotsTest {
     }
 
     @Test
-    fun onboardingTableSetup() {
+    fun onboardingTour1() {
+        val game = demoGame()
+        paparazzi.snapshot {
+            ScoreOrbitTheme(dynamicColor = false) {
+                OnboardingScreen(game = game, viewModel = stubViewModel(), initialPage = 1)
+            }
+        }
+    }
+
+    @Test
+    fun onboardingTour2() {
         val game = demoGame()
         paparazzi.snapshot {
             ScoreOrbitTheme(dynamicColor = false) {
                 OnboardingScreen(game = game, viewModel = stubViewModel(), initialPage = 2)
+            }
+        }
+    }
+
+    @Test
+    fun onboardingTour3() {
+        val game = demoGame()
+        paparazzi.snapshot {
+            ScoreOrbitTheme(dynamicColor = false) {
+                OnboardingScreen(game = game, viewModel = stubViewModel(), initialPage = 3)
+            }
+        }
+    }
+
+    @Test
+    fun onboardingTour4() {
+        val game = demoGame()
+        paparazzi.snapshot {
+            ScoreOrbitTheme(dynamicColor = false) {
+                OnboardingScreen(game = game, viewModel = stubViewModel(), initialPage = 4)
+            }
+        }
+    }
+
+    @Test
+    fun onboardingTableSetup() {
+        val game = demoGame()
+        paparazzi.snapshot {
+            ScoreOrbitTheme(dynamicColor = false) {
+                OnboardingScreen(game = game, viewModel = stubViewModel(), initialPage = 5)
             }
         }
     }

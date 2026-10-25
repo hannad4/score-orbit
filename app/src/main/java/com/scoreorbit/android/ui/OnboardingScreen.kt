@@ -6,6 +6,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,6 +24,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Settings
@@ -36,10 +40,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,7 +55,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import com.scoreorbit.android.model.Game
 import com.scoreorbit.android.ui.theme.ScoreOrbitColors
@@ -56,27 +68,40 @@ import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
 
+private const val PAGE_WELCOME = 0
+private const val PAGE_SETUP = 5
+private const val PAGE_COUNT = 6
+
 /**
- * First-run setup wizard: four swipeable pages that set the table and walk
- * through how to use the board, ending back on it. Page three is the only
- * thing that edits state — the player and team counts, live on the game;
- * everything else is words and pictures.
+ * First-run wizard. The welcome page offers two ways in: a quick start that
+ * jumps straight to table setup, or a swipeable tour of the app's features
+ * (dial, teams, winning, timer and history) that ends on the same setup page.
+ * Setup is the only page that edits state — the player and team counts, live
+ * on the game; everything else is words and pictures.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(
     game: Game,
     viewModel: ScoreViewModel,
-    initialPage: Int = 0,
+    initialPage: Int = PAGE_WELCOME,
 ) {
-    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { 4 })
+    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { PAGE_COUNT })
     val scope = rememberCoroutineScope()
     val theme = MaterialTheme.colorScheme
+    val page = pagerState.currentPage
+    // Quick start skips the tour, so back from setup returns to the welcome
+    // page rather than walking through pages that were never shown.
+    var quick by remember { mutableStateOf(false) }
+
+    fun goTo(target: Int) {
+        scope.launch { pagerState.animateScrollToPage(target) }
+    }
 
     // Back steps through the pages; on page one it falls through to the
     // system default (leaving the app), so nothing traps anybody.
-    BackHandler(enabled = pagerState.currentPage > 0) {
-        scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
+    BackHandler(enabled = page > PAGE_WELCOME) {
+        goTo(if (quick && page == PAGE_SETUP) PAGE_WELCOME else page - 1)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -85,12 +110,14 @@ fun OnboardingScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-        ) { page ->
-            when (page) {
-                0 -> WelcomePage(game)
-                1 -> HowToScorePage(game)
-                2 -> TableSetupPage(game, viewModel)
-                else -> AllSetPage(game)
+        ) { p ->
+            when (p) {
+                0 -> WelcomePage()
+                1 -> SpinPage(game)
+                2 -> TeamsPage()
+                3 -> WinningPage()
+                4 -> ToolsPage()
+                else -> TableSetupPage(game, viewModel)
             }
         }
 
@@ -103,8 +130,8 @@ fun OnboardingScreen(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                repeat(4) { i ->
-                    val active = pagerState.currentPage == i
+                repeat(PAGE_COUNT) { i ->
+                    val active = page == i
                     val size by animateDpAsState(if (active) 11.dp else 8.dp)
                     Spacer(modifier = Modifier.width(if (i > 0) 7.dp else 0.dp))
                     Box(
@@ -125,24 +152,40 @@ fun OnboardingScreen(
                     .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = { viewModel.completeOnboarding() }) {
-                    Text("Skip")
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                val last = pagerState.currentPage == 3
-                Button(
-                    onClick = {
-                        if (last) {
-                            viewModel.completeOnboarding()
-                        } else {
-                            scope.launch {
-                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                            }
-                        }
-                    },
-                    contentPadding = PaddingValues(horizontal = 28.dp, vertical = 12.dp),
-                ) {
-                    Text(if (last) "Start playing" else "Next")
+                when (page) {
+                    PAGE_WELCOME -> {
+                        OutlinedButton(
+                            onClick = {
+                                quick = true
+                                goTo(PAGE_SETUP)
+                            },
+                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                        ) { Text("Quick start") }
+                        Spacer(modifier = Modifier.weight(1f))
+                        Button(
+                            onClick = { goTo(1) },
+                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                        ) { Text("Take the tour") }
+                    }
+                    PAGE_SETUP -> {
+                        TextButton(
+                            onClick = { goTo(if (quick) PAGE_WELCOME else page - 1) },
+                        ) { Text("Back") }
+                        Spacer(modifier = Modifier.weight(1f))
+                        Button(
+                            onClick = { viewModel.completeOnboarding() },
+                            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 12.dp),
+                        ) { Text("Start playing") }
+                    }
+                    else -> {
+                        // Skipping the rest of the tour still lands on setup.
+                        TextButton(onClick = { goTo(PAGE_SETUP) }) { Text("Skip tour") }
+                        Spacer(modifier = Modifier.weight(1f))
+                        Button(
+                            onClick = { goTo(page + 1) },
+                            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 12.dp),
+                        ) { Text("Next") }
+                    }
                 }
             }
         }
@@ -258,40 +301,102 @@ private fun OrbitArt(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun WelcomePage(game: Game) {
+private fun WelcomePage() {
     WizardPage(
         title = "Welcome to Score Orbit",
-        subtitle = "Three short steps and you're playing.",
+        subtitle = "One dial for the whole table. Jump into a game now, or " +
+            "take a quick look around first.",
     ) {
         OrbitArt(modifier = Modifier.size(230.dp))
     }
 }
 
+/** Tour page chrome: a tinted icon badge above the title and bullets. */
 @Composable
-private fun HowToScorePage(game: Game) {
+private fun TourPage(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String? = null,
+    content: @Composable () -> Unit,
+) {
+    val theme = MaterialTheme.colorScheme
+    WizardPage(title = title, subtitle = subtitle) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(theme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = theme.onPrimaryContainer,
+                modifier = Modifier.size(36.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(18.dp))
+        content()
+    }
+}
+
+@Composable
+private fun SpinPage(game: Game) {
     val dots = wizardDots()
     WizardPage(
         title = "Spin to score",
+        subtitle = "Everyone shares the dial in the middle of the table.",
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            WizardBullet(
-                dots[0],
-                "Drag your dot around the ring \u2014 a full turn scores " +
-                    "${game.rotationPoints} points",
-            )
-            WizardBullet(
-                dots[1],
-                "Let go and the dial springs back, points banked",
-            )
-            WizardBullet(
-                dots[2],
-                "Tap a dot to turn its score to face that seat",
-            )
-            WizardBullet(
-                dots[3],
-                "Long-press a score and drop it on another seat to swap",
-            )
-        }
+        OrbitArt(modifier = Modifier.size(150.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+        WizardBullet(
+            dots[0],
+            "Drag your dot around the ring. One full lap scores " +
+                "${game.rotationPoints} points",
+        )
+        WizardBullet(dots[1], "Let go and the dial springs back with your points added")
+        WizardBullet(dots[2], "Tap a score to change its orientation")
+        WizardBullet(dots[3], "Long-press a score to reposition the player on the dial")
+    }
+}
+
+@Composable
+private fun TeamsPage() {
+    val dots = wizardDots()
+    TourPage(
+        icon = Icons.Default.Groups,
+        title = "Split the table",
+        subtitle = "Play solo, or split into teams.",
+    ) {
+        WizardBullet(dots[0], "Choose up to 4 teams and players are split evenly at random")
+        WizardBullet(dots[1], "Individual scores add up to a team's running total")
+        WizardBullet(dots[2], "Hold a player score and drop it in another zone to change team assignment")
+    }
+}
+
+@Composable
+private fun WinningPage() {
+    val dots = wizardDots()
+    TourPage(
+        icon = Icons.Default.EmojiEvents,
+        title = "Know who's winning",
+    ) {
+        WizardBullet(dots[0], "Trophies go to the top three. Settings decides whether highest or lowest score wins")
+        WizardIconRow(Icons.Default.Leaderboard, "Tap the bar chart to see the full leaderboard")
+        WizardBullet(dots[2], "Set a Score to Win and the game ends with confetti, or leave it blank and play as long as you like")
+    }
+}
+
+@Composable
+private fun ToolsPage() {
+    TourPage(
+        icon = Icons.Default.Timer,
+        title = "Handy extras",
+        subtitle = "Up in the top bar.",
+    ) {
+        WizardIconRow(Icons.Default.History, "Tap the history icon to see every score, with undo and redo")
+        WizardIconRow(Icons.Default.Timer, "Use the timer to keep track of time limits")
+        WizardIconRow(Icons.Default.Settings, "Tap the gear for teams, scoring rules, Score to Win and more")
     }
 }
 
@@ -299,9 +404,8 @@ private fun HowToScorePage(game: Game) {
 @Composable
 private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
     WizardPage(
-        title = "Your table",
-        subtitle = "Match the board to tonight's game \u2014 anything can still be " +
-            "changed later in Settings.",
+        title = "Set your table",
+        subtitle = "Set up tonight's game. You can change any of this later in Settings.",
     ) {
         Card(
             colors = CardDefaults.cardColors(
@@ -348,7 +452,7 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        "Players are dealt out evenly at random across the teams.",
+                        "Players are split evenly at random across the teams.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -356,39 +460,28 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
             }
         }
         Spacer(modifier = Modifier.height(14.dp))
+        val gear = "gear"
         Text(
-            "Names and colors are edited in Roster Setup.",
+            buildAnnotatedString {
+                append("Names and colors can be edited any time in Roster Setup, under the ")
+                appendInlineContent(gear, "[gear]")
+            },
+            inlineContent = mapOf(
+                gear to InlineTextContent(
+                    Placeholder(16.sp, 16.sp, PlaceholderVerticalAlign.TextCenter)
+                ) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = "gear icon",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-    }
-}
-
-@Composable
-private fun AllSetPage(game: Game) {
-    val theme = MaterialTheme.colorScheme
-    WizardPage(
-        title = "You're all set",
-    ) {
-        val setup = buildString {
-            append("${game.players.size} players")
-            append(if (game.teams.isEmpty()) " \u00b7 solo table" else " \u00b7 ${game.teams.size} teams")
-            append(" \u00b7 ${game.rotationPoints} points per lap")
-        }
-        Text(
-            setup,
-            style = MaterialTheme.typography.titleMedium,
-            color = theme.onSurface,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-        Column {
-            WizardIconRow(Icons.Default.History, "The clock opens score history with undo and redo")
-            WizardIconRow(Icons.Default.Leaderboard, "The bar chart opens the leaderboard")
-            WizardIconRow(Icons.Default.Timer, "The timer pill runs your turn countdown \u2014 it rings until you stop it")
-            WizardIconRow(Icons.Default.Settings, "The gear keeps teams, scoring rules, Score to Win and more")
-        }
     }
 }
 
