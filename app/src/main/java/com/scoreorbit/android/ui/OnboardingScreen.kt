@@ -442,6 +442,17 @@ private fun ToolsPage() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
+    var colorFor by remember { mutableStateOf<Player?>(null) }
+    colorFor?.let { player ->
+        ColorPaletteDialog(
+            selected = player.color,
+            onPick = {
+                viewModel.recolorPlayer(player.id, it)
+                colorFor = null
+            },
+            onDismiss = { colorFor = null },
+        )
+    }
     WizardPage(
         title = "Set your table",
         subtitle = "Set up tonight's game. You can change any of this later in Settings.",
@@ -469,7 +480,7 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Text(
-                        "Number of Teams",
+                        "Teams",
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -491,29 +502,28 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        "Players are split evenly at random across the teams.",
+                        "Players are split evenly at random; tap a chip to move a player between teams.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (game.teams.isNotEmpty()) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 280.dp)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                    ) {
-                        Text(
-                            "Pick each player's team",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        game.players.forEach { player ->
-                            TeamAssignRow(player, game, viewModel)
-                        }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = if (game.teams.isEmpty()) 280.dp else 240.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                ) {
+                    Text(
+                        "Roster",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    game.players.forEachIndexed { index, player ->
+                        RosterRow(index, player, game, viewModel,
+                            onPickColor = { colorFor = player })
                     }
                 }
             }
@@ -522,7 +532,7 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
         val gear = "gear"
         Text(
             buildAnnotatedString {
-                append("Change names and colors any time in Roster Setup, under the ")
+                append("Change this any time in Roster Setup, under the ")
                 appendInlineContent(gear, "[icon]")
             },
             inlineContent = mapOf(
@@ -544,56 +554,65 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
     }
 }
 
-/** One roster row: player dot + name, then a chip per team. Tapping a chip
- *  moves that player there. */
+/** One wizard roster row: color dot (tap to pick), name field, and — when
+ *  teams exist — a chip per team on a second line. */
 @Composable
-private fun TeamAssignRow(player: Player, game: Game, viewModel: ScoreViewModel) {
-    Row(
+private fun RosterRow(
+    index: Int,
+    player: Player,
+    game: Game,
+    viewModel: ScoreViewModel,
+    onPickColor: () -> Unit,
+) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(vertical = 4.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(14.dp)
-                .clip(CircleShape)
-                .background(Color(player.color))
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            player.name,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            game.teams.forEachIndexed { index, team ->
-                val assigned = player.teamId == team.id
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(if (assigned) Color(team.color) else Color.Transparent)
-                        .border(2.dp, Color(team.color), CircleShape)
-                        .clickable { viewModel.assignPlayer(player.id, team.id) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (assigned) {
-                        Icon(
-                            Icons.Default.Check,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    } else {
-                        Text(
-                            "${index + 1}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color(team.color),
-                        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ColorDot(color = player.color, onPick = onPickColor)
+            Spacer(modifier = Modifier.width(8.dp))
+            RosterNameField(
+                key = player.id,
+                initial = player.name,
+                defaultName = "Player ${index + 1}",
+                color = Color(player.color),
+                onRename = { viewModel.renamePlayer(player.id, it) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (game.teams.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 48.dp, top = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                game.teams.forEachIndexed { index, team ->
+                    val assigned = player.teamId == team.id
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .background(if (assigned) Color(team.color) else Color.Transparent)
+                            .border(2.dp, Color(team.color), CircleShape)
+                            .clickable { viewModel.assignPlayer(player.id, team.id) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (assigned) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        } else {
+                            Text(
+                                "${index + 1}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color(team.color),
+                            )
+                        }
                     }
                 }
             }

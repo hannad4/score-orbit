@@ -1010,7 +1010,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
 
 /** Color dot that opens the palette dialog. Shared by player and team rows. */
 @Composable
-private fun ColorDot(color: Int, onPick: () -> Unit) {
+internal fun ColorDot(color: Int, onPick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(40.dp)
@@ -1045,7 +1045,7 @@ private fun ColorDot(color: Int, onPick: () -> Unit) {
  * person's name, so autocapitalization kicks in.
  */
 @Composable
-private fun RosterNameField(
+internal fun RosterNameField(
     key: String,
     initial: String,
     defaultName: String,
@@ -1144,7 +1144,7 @@ private fun RingPreview(players: List<Player>, modifier: Modifier = Modifier) {
 /** 24-color palette in a Material dialog. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ColorPaletteDialog(selected: Int, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+internal fun ColorPaletteDialog(selected: Int, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.Palette, contentDescription = null) },

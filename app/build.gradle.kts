@@ -87,4 +87,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:5.14.2")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
+    // The real org.json so view-model serialization logic can run on the JVM.
+    testImplementation("org.json:json:20240303")
 }
