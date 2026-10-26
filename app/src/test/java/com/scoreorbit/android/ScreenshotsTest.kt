@@ -180,6 +180,16 @@ class ScreenshotsTest {
     }
 
     @Test
+    fun onboardingTableSetupTeams() {
+        val game = demoTeamsGame()
+        paparazzi.snapshot {
+            ScoreOrbitTheme(dynamicColor = false) {
+                OnboardingScreen(game = game, viewModel = stubViewModel(), initialPage = 5)
+            }
+        }
+    }
+
+    @Test
     fun timerBar() {
         paparazzi.snapshot {
             ScoreOrbitTheme(dynamicColor = false) {

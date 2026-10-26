@@ -5,6 +5,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
@@ -16,14 +18,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
@@ -59,9 +65,11 @@ import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import com.scoreorbit.android.model.Game
+import com.scoreorbit.android.model.Player
 import com.scoreorbit.android.ui.theme.ScoreOrbitColors
 import com.scoreorbit.android.viewmodel.ScoreViewModel
 import kotlinx.coroutines.launch
@@ -227,10 +235,33 @@ private fun WizardPage(
     }
 }
 
-/** Bullet row with a colored dot marker, matching the README banners. */
+/**
+ * Bullet row with a colored dot marker. When the text points at something
+ * the user taps on the board, pass it as [icon] and the actual glyph shows
+ * inline in the sentence instead of words like "the history icon".
+ */
+private const val INLINE_ICON_ID = "ic"
+
 @Composable
-private fun WizardBullet(color: Color, text: String) {
+private fun WizardBullet(
+    color: Color,
+    prefix: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    suffix: String = "",
+) {
     val theme = MaterialTheme.colorScheme
+    val inline = if (icon == null) emptyMap() else mapOf(
+        INLINE_ICON_ID to InlineTextContent(
+            Placeholder(20.sp, 20.sp, PlaceholderVerticalAlign.TextCenter)
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = theme.primary,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -245,7 +276,12 @@ private fun WizardBullet(color: Color, text: String) {
         )
         Spacer(modifier = Modifier.width(16.dp))
         Text(
-            text,
+            buildAnnotatedString {
+                append(prefix)
+                if (icon != null) appendInlineContent(INLINE_ICON_ID, icon.name)
+                append(suffix)
+            },
+            inlineContent = inline,
             style = MaterialTheme.typography.bodyLarge,
             color = theme.onSurfaceVariant,
         )
@@ -304,8 +340,6 @@ private fun OrbitArt(modifier: Modifier = Modifier) {
 private fun WelcomePage() {
     WizardPage(
         title = "Welcome to Score Orbit",
-        subtitle = "One dial for the whole table. Jump into a game now, or " +
-            "take a quick look around first.",
     ) {
         OrbitArt(modifier = Modifier.size(230.dp))
     }
@@ -344,19 +378,23 @@ private fun TourPage(
 private fun SpinPage(game: Game) {
     val dots = wizardDots()
     WizardPage(
-        title = "Spin to score",
-        subtitle = "Everyone shares the dial in the middle of the table.",
+        title = "How scoring works",
+        subtitle = "Everyone scores on the same dial.",
     ) {
         OrbitArt(modifier = Modifier.size(150.dp))
         Spacer(modifier = Modifier.height(12.dp))
         WizardBullet(
             dots[0],
-            "Drag your dot around the ring. One full lap scores " +
-                "${game.rotationPoints} points",
+            "Drag your dot around the ring \u2014 a full turn scores ",
+            null,
+            "${game.rotationPoints} points",
         )
-        WizardBullet(dots[1], "Let go and the dial springs back with your points added")
-        WizardBullet(dots[2], "Tap a score to change its orientation")
-        WizardBullet(dots[3], "Long-press a score to reposition the player on the dial")
+        WizardBullet(dots[1], "Let go and the dial springs back. Your points count.")
+        WizardBullet(dots[2], "Tap a score to turn which way it faces.")
+        WizardBullet(
+            dots[3],
+            "Long-press a score and drop it on another seat to swap players.",
+        )
     }
 }
 
@@ -365,12 +403,12 @@ private fun TeamsPage() {
     val dots = wizardDots()
     TourPage(
         icon = Icons.Default.Groups,
-        title = "Split the table",
-        subtitle = "Play solo, or split into teams.",
+        title = "Playing in teams",
+        subtitle = "Play solo, or split into up to 4 teams.",
     ) {
-        WizardBullet(dots[0], "Choose up to 4 teams and players are split evenly at random")
-        WizardBullet(dots[1], "Individual scores add up to a team's running total")
-        WizardBullet(dots[2], "Hold a player score and drop it in another zone to change team assignment")
+        WizardBullet(dots[0], "Players get dealt to teams at random, split evenly.")
+        WizardBullet(dots[1], "Everyone still scores alone. Each team's total sits beside the dial.")
+        WizardBullet(dots[2], "Drag a player's score into another area to move them to that team.")
     }
 }
 
@@ -381,9 +419,10 @@ private fun WinningPage() {
         icon = Icons.Default.EmojiEvents,
         title = "Know who's winning",
     ) {
-        WizardBullet(dots[0], "Trophies go to the top three. Settings decides whether highest or lowest score wins")
-        WizardIconRow(Icons.Default.Leaderboard, "Tap the bar chart to see the full leaderboard")
-        WizardBullet(dots[2], "Set a Score to Win and the game ends with confetti, or leave it blank and play as long as you like")
+        WizardBullet(dots[0], "Trophies mark the top three scores.")
+        WizardBullet(dots[1], "Tap ", Icons.Default.Leaderboard, " to see the full leaderboard.")
+        WizardBullet(dots[2], "You pick in Settings whether highest or lowest wins.")
+        WizardBullet(dots[3], "Set a Score to Win and the game ends in confetti. Leave it blank for endless play.")
     }
 }
 
@@ -392,11 +431,11 @@ private fun ToolsPage() {
     TourPage(
         icon = Icons.Default.Timer,
         title = "Handy extras",
-        subtitle = "Up in the top bar.",
+        subtitle = "All of these live in the top bar of the board.",
     ) {
-        WizardIconRow(Icons.Default.History, "Tap the history icon to see every score, with undo and redo")
-        WizardIconRow(Icons.Default.Timer, "Use the timer to keep track of time limits")
-        WizardIconRow(Icons.Default.Settings, "Tap the gear for teams, scoring rules, Score to Win and more")
+        WizardBullet(wizardDots()[0], "Tap ", Icons.Default.History, " to see every score. Undo and redo work too.")
+        WizardBullet(wizardDots()[1], "Tap ", Icons.Default.Timer, " to give each turn a countdown \u2014 it rings until you stop it.")
+        WizardBullet(wizardDots()[2], "Tap ", Icons.Default.Settings, " for teams, scoring rules, Score to Win and more.")
     }
 }
 
@@ -457,14 +496,34 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                if (game.teams.isNotEmpty()) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 280.dp)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    ) {
+                        Text(
+                            "Pick each player's team",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        game.players.forEach { player ->
+                            TeamAssignRow(player, game, viewModel)
+                        }
+                    }
+                }
             }
         }
         Spacer(modifier = Modifier.height(14.dp))
         val gear = "gear"
         Text(
             buildAnnotatedString {
-                append("Names and colors can be edited any time in Roster Setup, under the ")
-                appendInlineContent(gear, "[gear]")
+                append("Change names and colors any time in Roster Setup, under the ")
+                appendInlineContent(gear, "[icon]")
             },
             inlineContent = mapOf(
                 gear to InlineTextContent(
@@ -485,26 +544,59 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
     }
 }
 
+/** One roster row: player dot + name, then a chip per team. Tapping a chip
+ *  moves that player there. */
 @Composable
-private fun WizardIconRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
-    val theme = MaterialTheme.colorScheme
+private fun TeamAssignRow(player: Player, game: Game, viewModel: ScoreViewModel) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 9.dp),
+            .padding(vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = theme.primary,
-            modifier = Modifier.size(22.dp),
+        Box(
+            modifier = Modifier
+                .size(14.dp)
+                .clip(CircleShape)
+                .background(Color(player.color))
         )
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(10.dp))
         Text(
-            text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = theme.onSurfaceVariant,
+            player.name,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            game.teams.forEachIndexed { index, team ->
+                val assigned = player.teamId == team.id
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(if (assigned) Color(team.color) else Color.Transparent)
+                        .border(2.dp, Color(team.color), CircleShape)
+                        .clickable { viewModel.assignPlayer(player.id, team.id) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (assigned) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    } else {
+                        Text(
+                            "${index + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(team.color),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
