@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.PlusOne
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Visibility
@@ -479,6 +480,19 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
             }
 
                 SettingsGroup(label = "System Options") {
+                    ListItem(
+                        headlineContent = { Text("Setup Wizard") },
+                        supportingContent = { Text("Walk through the setup again") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.School,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        modifier = Modifier.clickable { viewModel.replayWizard() },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
                     ListItem(
                         headlineContent = { Text("Timer") },
                         supportingContent = { Text("Countdown pill on the board's top bar") },

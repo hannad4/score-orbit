@@ -283,19 +283,32 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     // the countdown drains from it, and Reset returns to it. Only the
     // default travels with the game.
 
+    /**
+     * Board timer +/-: moves between multiples of 5 seconds rather than a
+     * fixed step, so a reading mid-slide always lands on a clean number.
+     * From 1:12, + goes to 1:15, + again to 1:20; 1:12, − goes to 1:10.
+     * [deltaSec] only picks the direction.
+     */
     fun timerAdjust(deltaSec: Int) {
         val game = _currentGame.value ?: return
+        // Next/previous multiple of 5 seconds, taking at least one step so
+        // an already-clean value keeps moving.
+        fun step(from: Long): Long {
+            val base = from / 5L * 5L
+            val moving = if (deltaSec > 0) base + 5L else if (base == from) base - 5L else base
+            return moving.coerceIn(MIN_TIMER_SEC.toLong(), MAX_TIMER_SEC.toLong())
+        }
         if (_timerRunning.value) {
             // Running: shifts the deadline only; the armed duration is
             // untouched, so Reset still restores what the user chose.
-            val newSec = (_timerMs.value / 1000L + deltaSec).coerceAtLeast(15L)
+            val newSec = step(_timerMs.value / 1000L)
             _timerMs.value = newSec * 1000L
             timerEndAt = System.currentTimeMillis() + newSec * 1000L
         } else {
-            // Stopped: re-arming. This becomes the duration Start uses and
-            // the one Reset eventually returns to.
-            val newSec = (_timerSetMs.value / 1000L + deltaSec)
-                .coerceIn(MIN_TIMER_SEC.toLong(), MAX_TIMER_SEC.toLong())
+            // Stopped or paused: re-arming from whatever the clock reads,
+            // so a mid-countdown pause keeps its context (1:12, + → 1:15).
+            // This becomes the duration Start uses and Reset returns to.
+            val newSec = step(_timerMs.value / 1000L)
             _timerSetMs.value = newSec * 1000L
             _timerMs.value = newSec * 1000L
         }
@@ -627,8 +640,18 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     fun completeOnboarding() {
         val game = _currentGame.value ?: return
         _currentGame.value = game.copy(onboarded = true)
+        _showWizard.value = false
         persist()
     }
+
+    /** Settings request: show the setup wizard again over the board. */
+    fun replayWizard() {
+        _screen.value = AppScreen.Board
+        _showWizard.value = true
+    }
+
+    private val _showWizard = mutableStateOf(false)
+    val showWizard: State<Boolean> = _showWizard
 
     fun assignPlayer(playerId: String, teamId: String?) {
         val game = _currentGame.value ?: return

@@ -434,7 +434,7 @@ private fun ToolsPage() {
         subtitle = "All of these live in the top bar of the board.",
     ) {
         WizardBullet(wizardDots()[0], "Tap ", Icons.Default.History, " to see every score. Undo and redo work too.")
-        WizardBullet(wizardDots()[1], "Tap ", Icons.Default.Timer, " to give each turn a countdown \u2014 it rings until you stop it.")
+        WizardBullet(wizardDots()[1], "Tap ", Icons.Default.Timer, " to set a countdown timer.")
         WizardBullet(wizardDots()[2], "Tap ", Icons.Default.Settings, " for teams, scoring rules, Score to Win and more.")
     }
 }
@@ -528,29 +528,6 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
                 }
             }
         }
-        Spacer(modifier = Modifier.height(14.dp))
-        val gear = "gear"
-        Text(
-            buildAnnotatedString {
-                append("Change this any time in Roster Setup, under the ")
-                appendInlineContent(gear, "[icon]")
-            },
-            inlineContent = mapOf(
-                gear to InlineTextContent(
-                    Placeholder(16.sp, 16.sp, PlaceholderVerticalAlign.TextCenter)
-                ) {
-                    Icon(
-                        Icons.Default.Settings,
-                        contentDescription = "gear icon",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            ),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
     }
 }
 

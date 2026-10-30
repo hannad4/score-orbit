@@ -2416,12 +2416,12 @@ internal fun TurnTimerBar(
                 }
                 Spacer(Modifier.weight(1f))
                 // The adjusting pair brackets the clock exactly as specified:
-                // minus on the left, plus on the right, both ±15 seconds.
+                // minus on the left, plus on the right, both taking 5-second steps.
                 IconButton(
-                    onClick = { onAdjust(-15) },
+                    onClick = { onAdjust(-5) },
                     enabled = !timerRunning || timerMs > 15_000L,
                 ) {
-                    Icon(Icons.Default.Remove, contentDescription = "Subtract 15 seconds")
+                    Icon(Icons.Default.Remove, contentDescription = "Subtract 5 seconds")
                 }
                 Text(
                     formatTimer(timerMs),
@@ -2438,8 +2438,8 @@ internal fun TurnTimerBar(
                         .padding(horizontal = 8.dp)
                         .alpha(if (timerRinging) ringAlpha else 1f),
                 )
-                IconButton(onClick = { onAdjust(15) }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add 15 seconds")
+                IconButton(onClick = { onAdjust(5) }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add 5 seconds")
                 }
                 Spacer(Modifier.weight(1f))
                 // When the alarm is ringing, this becomes the stop button:

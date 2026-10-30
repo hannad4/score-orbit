@@ -87,4 +87,53 @@ class ScoreViewModelTest {
         val saved = checkNotNull(store["saved_game"])
         assertEquals(300, JSONObject(saved).getInt("timerStartSec"))
     }
+
+    @Test
+    fun timerAdjust_stepsBetweenFiveSecondQuantums() {
+        val viewModel = makeViewModel()
+        viewModel.setTimerStartSec(120) // armed at 2:00
+
+        // From a clean value, + takes a full step.
+        viewModel.timerAdjust(5)
+        assertEquals(125_000L, viewModel.timerMs.value)
+        assertEquals(125_000L, viewModel.timerSetMs.value)
+
+        // And - returns to the previous clean value.
+        viewModel.timerAdjust(-5)
+        assertEquals(120_000L, viewModel.timerMs.value)
+
+        // Minus floors to the multiple of 5 below, never above it.
+        viewModel.setTimerStartSec(118)
+        viewModel.timerAdjust(-5)
+        assertEquals(115_000L, viewModel.timerMs.value)
+
+        // Plus rounds to the multiple of 5 above, at least one full step.
+        viewModel.setTimerStartSec(120)
+        viewModel.timerAdjust(-5) // 115
+        viewModel.timerAdjust(-5) // 110
+        viewModel.timerAdjust(-5) // 105
+        viewModel.timerAdjust(-5) // 100
+        viewModel.timerAdjust(-5) // 95
+        viewModel.timerAdjust(-5) // 90
+        viewModel.timerAdjust(-5) // 85
+        viewModel.timerAdjust(-5) // 80
+        viewModel.timerAdjust(-5) // 75
+        viewModel.timerAdjust(-5) // 70
+        viewModel.timerAdjust(-5) // 65
+        viewModel.timerAdjust(-5) // 60
+        viewModel.timerAdjust(-5) // 55
+        viewModel.timerAdjust(-5) // 50
+        viewModel.timerAdjust(-5) // 45
+        viewModel.timerAdjust(-5) // 40
+        viewModel.timerAdjust(-5) // 35
+        viewModel.timerAdjust(-5) // 30
+        viewModel.timerAdjust(-5) // 25
+        viewModel.timerAdjust(-5) // 20
+        viewModel.timerAdjust(-5) // 15: the floor
+        viewModel.timerAdjust(-5)
+        assertEquals(15_000L, viewModel.timerMs.value) // the 15-second floor stops it
+        // And plus walks back up from the floor in full steps.
+        viewModel.timerAdjust(5)
+        assertEquals(20_000L, viewModel.timerMs.value)
+    }
 }
