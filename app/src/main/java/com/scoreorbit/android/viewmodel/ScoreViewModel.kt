@@ -653,17 +653,22 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     private val _showWizard = mutableStateOf(false)
     val showWizard: State<Boolean> = _showWizard
 
-    fun assignPlayer(playerId: String, teamId: String?) {
+    fun assignPlayer(playerId: String, teamId: String?, keepEmpty: Boolean = false) {
         val game = _currentGame.value ?: return
         if (teamId != null && game.teams.none { it.id == teamId }) return
         _currentGame.value = game.copy(
             players = game.players.map { if (it.id == playerId) it.copy(teamId = teamId) else it },
-        ).pruned()
+        ).pruned(keepEmpty)
         persist()
     }
 
-    /** Teams left with no players go away on their own. */
-    private fun Game.pruned(): Game {
+    /**
+     * Teams left with no players go away on their own — unless [keepEmpty]
+     * is true, which the setup wizard passes so handing players between the
+     * team chips can never shrink the team count underneath the selector.
+     */
+    private fun Game.pruned(keepEmpty: Boolean = false): Game {
+        if (keepEmpty) return this
         val used = players.mapNotNull { it.teamId }.toSet()
         return if (teams.any { it.id !in used }) copy(teams = teams.filter { it.id in used }) else this
     }

@@ -89,6 +89,36 @@ class ScoreViewModelTest {
     }
 
     @Test
+    fun wizardAssign_keepsTeamsWithNoPlayers() {
+        val viewModel = makeViewModel()
+        viewModel.setPlayerCount(6)
+        viewModel.setTeamCount(3)
+        val game = checkNotNull(viewModel.currentGame.value)
+        assertEquals(3, game.teams.size)
+
+        // Moving every member off the first team from the wizard chips must
+        // not shrink the team count — the selector still shows 3.
+        val from = game.teams[0].id
+        val to = game.teams[1].id
+        game.players.filter { it.teamId == from }.forEach {
+            viewModel.assignPlayer(it.id, to, keepEmpty = true)
+        }
+        assertEquals(3, checkNotNull(viewModel.currentGame.value).teams.size)
+
+        // The board path still prunes the same way it always did. Go down
+        // and back up so a fresh deal fills every team, then clear one out.
+        viewModel.setTeamCount(2)
+        viewModel.setTeamCount(3)
+        val before = checkNotNull(viewModel.currentGame.value)
+        assertEquals(3, before.teams.size)
+        val victim = before.teams[2].id
+        before.players.filter { it.teamId == victim }.forEach {
+            viewModel.assignPlayer(it.id, null)
+        }
+        assertEquals(2, checkNotNull(viewModel.currentGame.value).teams.size)
+    }
+
+    @Test
     fun timerAdjust_stepsBetweenFiveSecondQuantums() {
         val viewModel = makeViewModel()
         viewModel.setTimerStartSec(120) // armed at 2:00

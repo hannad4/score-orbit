@@ -46,7 +46,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.ManageAccounts
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
@@ -117,6 +119,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import com.scoreorbit.android.BuildConfig
 import com.scoreorbit.android.model.Game
 import com.scoreorbit.android.model.Player
 import com.scoreorbit.android.model.Team
@@ -481,19 +487,6 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
 
                 SettingsGroup(label = "System Options") {
                     ListItem(
-                        headlineContent = { Text("Setup Wizard") },
-                        supportingContent = { Text("Walk through the setup again") },
-                        leadingContent = {
-                            Icon(
-                                Icons.Default.School,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        modifier = Modifier.clickable { viewModel.replayWizard() },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    )
-                    ListItem(
                         headlineContent = { Text("Timer") },
                         supportingContent = { Text("Countdown pill on the board's top bar") },
                         leadingContent = {
@@ -626,6 +619,62 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                 ) {
                     Text("Start a New Game")
                 }
+            }
+            // Bottom group, shown with or without a live game.
+            SettingsGroup(label = "Other") {
+                if (game != null) {
+                    ListItem(
+                        headlineContent = { Text("Setup Wizard") },
+                        supportingContent = { Text("Walk through the setup again") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.School,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        modifier = Modifier.clickable { viewModel.replayWizard() },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
+                }
+                ListItem(
+                    headlineContent = { Text("App version") },
+                    supportingContent = {
+                        Text("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                )
+                ListItem(
+                    headlineContent = { Text("GitHub page") },
+                    supportingContent = { Text("github.com/hannad4/score-orbit") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.OpenInNew,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        try {
+                            ctx.startActivity(
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("https://github.com/hannad4/score-orbit"),
+                                )
+                            )
+                        } catch (_: ActivityNotFoundException) {
+                            // No browser present; nothing to do.
+                        }
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                )
             }
             Spacer(modifier = Modifier.height(16.dp))
         }

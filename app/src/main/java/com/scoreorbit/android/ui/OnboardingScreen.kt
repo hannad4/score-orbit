@@ -385,16 +385,13 @@ private fun SpinPage(game: Game) {
         Spacer(modifier = Modifier.height(12.dp))
         WizardBullet(
             dots[0],
-            "Drag your dot around the ring \u2014 a full turn scores ",
+            "Drag your dot around the ring. A full turn scores ",
             null,
             "${game.rotationPoints} points",
         )
-        WizardBullet(dots[1], "Let go and the dial springs back. Your points count.")
+        WizardBullet(dots[1], "Let go and it springs back. Your points count.")
         WizardBullet(dots[2], "Tap a score to turn which way it faces.")
-        WizardBullet(
-            dots[3],
-            "Long-press a score and drop it on another seat to swap players.",
-        )
+        WizardBullet(dots[3], "Long-press a score and drop it on another seat to swap players.")
     }
 }
 
@@ -406,9 +403,9 @@ private fun TeamsPage() {
         title = "Playing in teams",
         subtitle = "Play solo, or split into up to 4 teams.",
     ) {
-        WizardBullet(dots[0], "Players get dealt to teams at random, split evenly.")
-        WizardBullet(dots[1], "Everyone still scores alone. Each team's total sits beside the dial.")
-        WizardBullet(dots[2], "Drag a player's score into another area to move them to that team.")
+        WizardBullet(dots[0], "Players are split evenly at random.")
+        WizardBullet(dots[1], "Each player still scores alone. Team totals sit beside the dials.")
+        WizardBullet(dots[2], "Drag a player onto another team's area to move them.")
     }
 }
 
@@ -420,9 +417,9 @@ private fun WinningPage() {
         title = "Know who's winning",
     ) {
         WizardBullet(dots[0], "Trophies mark the top three scores.")
-        WizardBullet(dots[1], "Tap ", Icons.Default.Leaderboard, " to see the full leaderboard.")
-        WizardBullet(dots[2], "You pick in Settings whether highest or lowest wins.")
-        WizardBullet(dots[3], "Set a Score to Win and the game ends in confetti. Leave it blank for endless play.")
+        WizardBullet(dots[1], "Tap ", Icons.Default.Leaderboard, " to see every score.")
+        WizardBullet(dots[2], "Pick ", Icons.Default.Settings, " whether highest or lowest wins.")
+        WizardBullet(dots[3], "Set a Score to Win and the game ends in confetti. Leave it blank to keep going.")
     }
 }
 
@@ -433,7 +430,7 @@ private fun ToolsPage() {
         title = "Handy extras",
         subtitle = "All of these live in the top bar of the board.",
     ) {
-        WizardBullet(wizardDots()[0], "Tap ", Icons.Default.History, " to see every score. Undo and redo work too.")
+        WizardBullet(wizardDots()[0], "Tap ", Icons.Default.History, " to undo or redo a score.")
         WizardBullet(wizardDots()[1], "Tap ", Icons.Default.Timer, " to set a countdown timer.")
         WizardBullet(wizardDots()[2], "Tap ", Icons.Default.Settings, " for teams, scoring rules, Score to Win and more.")
     }
@@ -573,7 +570,9 @@ private fun RosterRow(
                             .clip(CircleShape)
                             .background(if (assigned) Color(team.color) else Color.Transparent)
                             .border(2.dp, Color(team.color), CircleShape)
-                            .clickable { viewModel.assignPlayer(player.id, team.id) },
+                            // Wizard chips never let a team die: moving the
+                            // last member out must keep the team count intact.
+                            .clickable { viewModel.assignPlayer(player.id, team.id, keepEmpty = true) },
                         contentAlignment = Alignment.Center,
                     ) {
                         if (assigned) {
