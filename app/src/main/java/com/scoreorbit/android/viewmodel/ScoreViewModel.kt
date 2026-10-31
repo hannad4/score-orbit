@@ -33,7 +33,6 @@ import org.json.JSONObject
 sealed interface AppScreen {
     data object Board : AppScreen
     data object Settings : AppScreen
-    data object PlayerSetup : AppScreen
     data object ScoreHistory : AppScreen
     data object Leaderboard : AppScreen
 }

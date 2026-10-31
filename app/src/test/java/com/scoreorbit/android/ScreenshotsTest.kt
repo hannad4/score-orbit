@@ -12,7 +12,6 @@ import com.scoreorbit.android.model.Team
 import com.scoreorbit.android.model.WinMetric
 import com.scoreorbit.android.ui.LeaderboardScreen
 import com.scoreorbit.android.ui.OnboardingScreen
-import com.scoreorbit.android.ui.PlayerSetupScreen
 import com.scoreorbit.android.ui.ScoreHistoryScreen
 import com.scoreorbit.android.ui.ScoreboardScreen
 import com.scoreorbit.android.ui.TurnTimerBar
@@ -85,16 +84,6 @@ class ScreenshotsTest {
         paparazzi.snapshot {
             ScoreOrbitTheme(dynamicColor = false) {
                 SettingsScreen(game = game, viewModel = stubViewModel())
-            }
-        }
-    }
-
-    @Test
-    fun playerSetup() {
-        val game = demoGame()
-        paparazzi.snapshot {
-            ScoreOrbitTheme(dynamicColor = false) {
-                PlayerSetupScreen(game = game, viewModel = stubViewModel())
             }
         }
     }
@@ -293,16 +282,6 @@ class ScreenshotsTest {
         paparazzi.snapshot {
             ScoreOrbitTheme(dynamicColor = false) {
                 LeaderboardScreen(game = game, viewModel = stubViewModel())
-            }
-        }
-    }
-
-    @Test
-    fun teamsPlayerSetup() {
-        val game = demoTeamsGame()
-        paparazzi.snapshot {
-            ScoreOrbitTheme(dynamicColor = false) {
-                PlayerSetupScreen(game = game, viewModel = stubViewModel())
             }
         }
     }

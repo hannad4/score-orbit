@@ -519,57 +519,10 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     game.players.forEachIndexed { index, player ->
-                        RosterRow(index, player, game, viewModel,
+                        PlayerRosterRow(index, player, game, viewModel,
                             onPickColor = { colorFor = player })
                     }
                 }
-            }
-        }
-    }
-}
-
-/** One wizard roster row: color dot (tap to pick), name field, and — when
- *  teams exist — a chip per team on a second line. */
-@Composable
-private fun RosterRow(
-    index: Int,
-    player: Player,
-    game: Game,
-    viewModel: ScoreViewModel,
-    onPickColor: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ColorDot(color = player.color, onPick = onPickColor)
-            Spacer(modifier = Modifier.width(8.dp))
-            RosterNameField(
-                key = player.id,
-                initial = player.name,
-                defaultName = "Player ${index + 1}",
-                color = Color(player.color),
-                onRename = { viewModel.renamePlayer(player.id, it) },
-                modifier = Modifier.weight(1f),
-            )
-        }
-        if (game.teams.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 48.dp, top = 2.dp),
-            ) {
-                TeamChipRow(
-                    player = player,
-                    teams = game.teams,
-                    onAssign = {
-                        // Wizard chips never let a team die: moving the
-                        // last member out must keep the team count intact.
-                        viewModel.assignPlayer(player.id, it, keepEmpty = true)
-                    },
-                )
             }
         }
     }

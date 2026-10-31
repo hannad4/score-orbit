@@ -157,6 +157,7 @@ private val hapticLevels = listOf(
 @Composable
 fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollState? = null) {
     var showRestartConfirm by remember { mutableStateOf(false) }
+    var rosterColorFor by remember { mutableStateOf<Player?>(null) }
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val ctx = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -277,37 +278,26 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            "Players are dealt evenly at random. Move players in Roster Setup.",
+                            "Players are dealt evenly at random; tap a chip to move a player between teams.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    ListItem(
-                        headlineContent = { Text("Roster Setup") },
-                        supportingContent = {
-                            Text(
-                                if (teamMode) "${game.players.size} players \u2022 ${game.teams.size} teams"
-                                else "${game.players.size} players"
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                Icons.Default.ManageAccounts,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        trailingContent = {
-                            Icon(
-                                Icons.Default.ChevronRight,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        modifier = Modifier.clickable { viewModel.go(AppScreen.PlayerSetup) },
-                    )
+                    // The roster made up like the setup wizard: dot to
+                    // recolor, name field, and team chips under each player.
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(
+                            "Roster",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        game.players.forEachIndexed { index, player ->
+                            PlayerRosterRow(index, player, game, viewModel,
+                                onPickColor = { rosterColorFor = player })
+                        }
+                    }
                 }
 
                 SettingsGroup(label = "Scoring") {
@@ -698,6 +688,17 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
             },
         )
     }
+
+    rosterColorFor?.let { player ->
+        ColorPaletteDialog(
+            selected = player.color,
+            onPick = {
+                viewModel.recolorPlayer(player.id, it)
+                rosterColorFor = null
+            },
+            onDismiss = { rosterColorFor = null },
+        )
+    }
 }
 
 @Composable
@@ -797,234 +798,54 @@ internal fun HoldRepeatButton(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Player setup
-// ---------------------------------------------------------------------------
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+/**
+ * One roster row for any setup surface: color dot (tap to pick), name
+ * field, and — when teams exist — a chip per team on a second line. Used
+ * by the setup wizard and the Players section in Settings.
+ */
 @Composable
-fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
-    val ctx = LocalContext.current
-    var latestGame by remember { mutableStateOf(game) }
-    latestGame = game
-    var paletteFor by remember { mutableStateOf<Player?>(null) }
-    val listState = rememberLazyListState()
-    // Long-press-drag reorder state. The dragged card follows the finger via
-    // graphicsLayer (placement untouched); neighbors swap live underneath.
-    var draggedId by remember(game.id) { mutableStateOf<String?>(null) }
-    var dragOffsetY by remember(game.id) { mutableFloatStateOf(0f) }
-    var cardHeightPx by remember(game.id) { mutableIntStateOf(0) }
-    val density = LocalDensity.current
-    val stepPx = cardHeightPx + with(density) { 10.dp.toPx() }
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-    // Team mode shows the Teams section and per-player team chips;
-    // Individual mode is a pure player list.
-    val teamMode = game.teams.isNotEmpty()
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            SharedTopAppBar(
-                title = "Roster Setup",
-                viewModel = viewModel,
-                scrollBehavior = scrollBehavior,
-                backDestination = AppScreen.Settings,
-                actions = {
-                    // Explicit confirmation path: everything already saves
-                    // as you type, so Done just steps back to Settings.
-                    FilledTonalButton(
-                        onClick = { viewModel.go(AppScreen.Settings) },
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
-                    ) {
-                        Text("Done", style = MaterialTheme.typography.titleSmall)
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                },
+internal fun PlayerRosterRow(
+    index: Int,
+    player: Player,
+    game: Game,
+    viewModel: ScoreViewModel,
+    onPickColor: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ColorDot(color = player.color, onPick = onPickColor)
+            Spacer(modifier = Modifier.width(8.dp))
+            RosterNameField(
+                key = player.id,
+                initial = player.name,
+                defaultName = "Player ${index + 1}",
+                color = Color(player.color),
+                onRename = { viewModel.renamePlayer(player.id, it) },
+                modifier = Modifier.weight(1f),
             )
-        },
-        floatingActionButton = {
-            if (game.players.size < 12) {
-                androidx.compose.material3.ExtendedFloatingActionButton(
-                    onClick = { viewModel.addPlayer() },
-                    icon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
-                    text = { Text("Add Player") },
+        }
+        if (game.teams.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 48.dp, top = 2.dp),
+            ) {
+                TeamChipRow(
+                    player = player,
+                    teams = game.teams,
+                    onAssign = {
+                        // Reassigning must never shrink the team list here:
+                        // counts change explicitly through the pills, and an
+                        // empty team dying mid-edit looks like a glitch.
+                        viewModel.assignPlayer(player.id, it, keepEmpty = true)
+                    },
                 )
-            }
-        },
-    ) { paddingValues ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            item {
-                Text(
-                    "Changes apply instantly",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    if (teamMode) "Drag the handle to reorder \u2022 tap a numbered chip to move a player between teams, or drag players between teams on the main page"
-                    else "Drag the handle to reorder",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            // Mini ring preview.
-            item {
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    RingPreview(players = game.players)
-                }
-            }
-            items(game.players, key = { it.id }) { player ->
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer
-                    ),
-                    modifier = Modifier
-                        .onSizeChanged { if (cardHeightPx == 0) cardHeightPx = it.height }
-                        .zIndex(if (draggedId == player.id) 1f else 0f)
-                        .graphicsLayer {
-                            if (draggedId == player.id) {
-                                translationY = dragOffsetY
-                                scaleX = 1.03f
-                                scaleY = 1.03f
-                                shadowElevation = 24f
-                            }
-                        }
-                        .animateItemPlacement(),
-                ) {
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                Icons.Default.DragHandle,
-                                contentDescription = "Drag to reorder",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .pointerInput(player.id) {
-                                        detectDragGesturesAfterLongPress(
-                                            onDragStart = {
-                                                draggedId = player.id
-                                                dragOffsetY = 0f
-                                                if (latestGame.hapticsEnabled) {
-                                                    buzz(ctx, 25, latestGame.hapticStrength)
-                                                }
-                                            },
-                                            onDrag = { change, amount ->
-                                                change.consume()
-                                                dragOffsetY += amount.y
-                                                if (stepPx > 0f) {
-                                                    val shift = (dragOffsetY / stepPx).roundToInt()
-                                                    if (shift != 0) {
-                                                        val g = latestGame
-                                                        val idx = g.players.indexOfFirst { p -> p.id == player.id }
-                                                        if (idx >= 0) {
-                                                            viewModel.movePlayer(player.id, idx + shift)
-                                                            dragOffsetY -= shift * stepPx
-                                                            if (latestGame.hapticsEnabled) {
-                                                                buzz(ctx, 12, latestGame.hapticStrength)
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            },
-                                            onDragEnd = {
-                                                draggedId = null
-                                                dragOffsetY = 0f
-                                            },
-                                            onDragCancel = {
-                                                draggedId = null
-                                                dragOffsetY = 0f
-                                            },
-                                        )
-                                    },
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            ColorDot(color = player.color, onPick = { paletteFor = player })
-                            Spacer(modifier = Modifier.width(4.dp))
-                            RosterNameField(
-                                key = player.id,
-                                initial = player.name,
-                                defaultName = "Player ${game.players.indexOfFirst { p -> p.id == player.id } + 1}",
-                                color = Color(player.color),
-                                onRename = { viewModel.renamePlayer(player.id, it) },
-                                modifier = Modifier.weight(1f),
-                            )
-                            if (game.players.size > 1) {
-                                IconButton(
-                                    onClick = { viewModel.removePlayer(player.id) },
-                                    modifier = Modifier.size(32.dp),
-                                ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Remove player",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        }
-                        // The wizard's numbered chips: tap to move this
-                        // player onto that team (shown only when teams are
-                        // on). Indented to sit under the name field.
-                        if (teamMode) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 72.dp, bottom = 8.dp),
-                            ) {
-                                TeamChipRow(
-                                    player = player,
-                                    teams = game.teams,
-                                    // Same rule as the wizard: reassigning
-                                    // must never shrink the team list; teams
-                                    // are deleted explicitly on their cards.
-                                    onAssign = { viewModel.assignPlayer(player.id, it, keepEmpty = true) },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            item {
-                if (game.players.size >= 12) {
-                    Text(
-                        "Maximum 12 players",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                Spacer(modifier = Modifier.height(88.dp))
             }
         }
-    }
-
-    paletteFor?.let { player ->
-        ColorPaletteDialog(
-            selected = player.color,
-            onPick = {
-                viewModel.recolorPlayer(player.id, it)
-                paletteFor = null
-            },
-            onDismiss = { paletteFor = null },
-        )
     }
 }
 
@@ -1096,7 +917,6 @@ internal fun ColorDot(color: Int, onPick: () -> Unit) {
         )
     }
 }
-
 /**
  * Hint-style name box: untouched defaults live as an empty box with the
  * default as the hint, so there is never any text to fight over — tapping
@@ -1170,38 +990,6 @@ internal fun RosterNameField(
     )
 }
 
-
-/** Small ring with the players' dots, previewing the tabletop board. */
-@Composable
-private fun RingPreview(players: List<Player>, modifier: Modifier = Modifier) {
-    Canvas(
-        modifier = modifier
-            .size(150.dp)
-            .background(MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.large)
-            .padding(8.dp)
-            .size(134.dp)
-    ) {
-        val cx = size.width / 2f
-        val cy = size.height / 2f
-        val r = minOf(size.width, size.height) * 0.32f
-        drawCircle(
-            color = Color.Gray.copy(alpha = 0.35f),
-            radius = r,
-            center = Offset(cx, cy),
-        )
-        players.forEachIndexed { i, p ->
-            val a = (-90.0 + i * 360.0 / players.size) * Math.PI / 180.0
-            drawCircle(
-                color = Color(p.color),
-                radius = minOf(size.width, size.height) * 0.11f,
-                center = Offset(
-                    cx + cos(a).toFloat() * r,
-                    cy + sin(a).toFloat() * r,
-                ),
-            )
-        }
-    }
-}
 
 /** 24-color palette in a Material dialog. */
 @OptIn(ExperimentalLayoutApi::class)

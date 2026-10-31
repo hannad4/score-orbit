@@ -25,7 +25,6 @@ fun ScoreOrbitApp(viewModel: ScoreViewModel) {
 
     BackHandler(enabled = screen != AppScreen.Board) {
         when (screen) {
-            AppScreen.PlayerSetup -> viewModel.go(AppScreen.Settings)
             AppScreen.ScoreHistory -> viewModel.go(AppScreen.Board)
             AppScreen.Leaderboard -> viewModel.go(AppScreen.Board)
             AppScreen.Settings -> if (game != null) viewModel.go(AppScreen.Board)
@@ -65,11 +64,6 @@ fun ScoreOrbitApp(viewModel: ScoreViewModel) {
                     }
                 }
                 AppScreen.Settings -> SettingsScreen(game = game, viewModel = viewModel)
-                AppScreen.PlayerSetup -> {
-                    val g = game
-                    if (g != null) PlayerSetupScreen(game = g, viewModel = viewModel)
-                    else SettingsScreen(game = null, viewModel = viewModel)
-                }
                 AppScreen.ScoreHistory -> {
                     val g = game
                     if (g != null) ScoreHistoryScreen(game = g, viewModel = viewModel)
