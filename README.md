@@ -55,13 +55,13 @@ Pick a team count and players are dealt out randomly and evenly. Two teams split
 
 ![Know who's winning — leaderboard](docs/shots/hero-race.png)
 
-Trophies on the top three scores follow the Highest/Lowest setting, the leaderboard ranks everyone with medal highlights, and a Score to Win target ends the game in confetti — or leave it blank and play endless.
+Trophies on the top three scores follow the Highest/Lowest setting, the leaderboard ranks everyone with medal highlights, and a Score Goal target ends the game in confetti — or leave it blank and play endless.
 
 <p align="center"><img src="docs/shots/hr.png" width="50%" alt=""></p>
 
 ## Everything else
 
-- ⏱ **Turn timer** — a pill in the top bar expands into a full timer strip: 15-second steps, start-pause, reset, and a progress rail that drains with the countdown. At time's up it rings until you stop it
+- ⏱ **Turn timer** — a pill in the top bar expands into a full timer strip: 5-second steps from any reading, down to 5 seconds, start-pause, reset, and a progress rail that drains with the countdown. At time's up it rings until you stop it
 - 🕘 **Score history** — every entry in a ledger with undo/redo, newest first
 - 📳 **Gesture-safe board** — the bottom strip ignores touches, so swiping home never scores by accident
 - 💾 **Never loses your game** — setup, scores, and undo history save on every change and restore on launch
@@ -72,13 +72,13 @@ Trophies on the top three scores follow the Highest/Lowest setting, the leaderbo
 
 <p align="center">
   <img src="docs/shots/tile-board.png" width="220" alt="The ring">
-  <img src="docs/shots/tile-players.png" width="220" alt="Roster setup">
+  <img src="docs/shots/tile-teams.png" width="220" alt="Team quadrants">
   <img src="docs/shots/tile-settings.png" width="220" alt="Settings">
 </p>
 <p align="center">
+  <img src="docs/shots/tile-players.png" width="220" alt="Set your table">
   <img src="docs/shots/tile-history.png" width="220" alt="Score history">
   <img src="docs/shots/tile-leaderboard.png" width="220" alt="Leaderboard">
-  <img src="docs/shots/tile-teams.png" width="220" alt="Teams">
 </p>
 
 <p align="center"><img src="docs/shots/hr.png" width="50%" alt=""></p>
@@ -108,6 +108,12 @@ Screenshots are generated headless with Paparazzi:
 
 ```bash
 ./gradlew recordPaparazziDebug
+```
+
+The README banners and tiles are stamped from those snapshots:
+
+```bash
+python3 tools/make_docs_art.py
 ```
 
 ## Feedback
