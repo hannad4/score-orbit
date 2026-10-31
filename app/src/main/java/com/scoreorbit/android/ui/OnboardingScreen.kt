@@ -560,37 +560,16 @@ private fun RosterRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 48.dp, top = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                game.teams.forEachIndexed { index, team ->
-                    val assigned = player.teamId == team.id
-                    Box(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .clip(CircleShape)
-                            .background(if (assigned) Color(team.color) else Color.Transparent)
-                            .border(2.dp, Color(team.color), CircleShape)
-                            // Wizard chips never let a team die: moving the
-                            // last member out must keep the team count intact.
-                            .clickable { viewModel.assignPlayer(player.id, team.id, keepEmpty = true) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (assigned) {
-                            Icon(
-                                Icons.Default.Check,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        } else {
-                            Text(
-                                "${index + 1}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color(team.color),
-                            )
-                        }
-                    }
-                }
+                TeamChipRow(
+                    player = player,
+                    teams = game.teams,
+                    onAssign = {
+                        // Wizard chips never let a team die: moving the
+                        // last member out must keep the team count intact.
+                        viewModel.assignPlayer(player.id, it, keepEmpty = true)
+                    },
+                )
             }
         }
     }

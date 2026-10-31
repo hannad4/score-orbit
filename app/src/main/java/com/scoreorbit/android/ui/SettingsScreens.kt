@@ -41,6 +41,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
@@ -276,7 +277,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            "Players are dealt out evenly at random across the teams.",
+                            "Players are dealt evenly at random. Move players in Roster Setup.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -870,7 +871,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    if (teamMode) "Drag the handle to reorder \u2022 drag scores between zones on the board to change teams"
+                    if (teamMode) "Drag the handle to reorder \u2022 tap a numbered chip to move a player between teams"
                     else "Drag the handle to reorder",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -959,74 +960,95 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                         }
                         .animateItemPlacement(),
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Default.DragHandle,
-                            contentDescription = "Drag to reorder",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .pointerInput(player.id) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = {
-                                            draggedId = player.id
-                                            dragOffsetY = 0f
-                                            if (latestGame.hapticsEnabled) {
-                                                buzz(ctx, 25, latestGame.hapticStrength)
-                                            }
-                                        },
-                                        onDrag = { change, amount ->
-                                            change.consume()
-                                            dragOffsetY += amount.y
-                                            if (stepPx > 0f) {
-                                                val shift = (dragOffsetY / stepPx).roundToInt()
-                                                if (shift != 0) {
-                                                    val g = latestGame
-                                                    val idx = g.players.indexOfFirst { p -> p.id == player.id }
-                                                    if (idx >= 0) {
-                                                        viewModel.movePlayer(player.id, idx + shift)
-                                                        dragOffsetY -= shift * stepPx
-                                                        if (latestGame.hapticsEnabled) {
-                                                            buzz(ctx, 12, latestGame.hapticStrength)
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Default.DragHandle,
+                                contentDescription = "Drag to reorder",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .pointerInput(player.id) {
+                                        detectDragGesturesAfterLongPress(
+                                            onDragStart = {
+                                                draggedId = player.id
+                                                dragOffsetY = 0f
+                                                if (latestGame.hapticsEnabled) {
+                                                    buzz(ctx, 25, latestGame.hapticStrength)
+                                                }
+                                            },
+                                            onDrag = { change, amount ->
+                                                change.consume()
+                                                dragOffsetY += amount.y
+                                                if (stepPx > 0f) {
+                                                    val shift = (dragOffsetY / stepPx).roundToInt()
+                                                    if (shift != 0) {
+                                                        val g = latestGame
+                                                        val idx = g.players.indexOfFirst { p -> p.id == player.id }
+                                                        if (idx >= 0) {
+                                                            viewModel.movePlayer(player.id, idx + shift)
+                                                            dragOffsetY -= shift * stepPx
+                                                            if (latestGame.hapticsEnabled) {
+                                                                buzz(ctx, 12, latestGame.hapticStrength)
+                                                            }
                                                         }
                                                     }
                                                 }
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            draggedId = null
-                                            dragOffsetY = 0f
-                                        },
-                                        onDragCancel = {
-                                            draggedId = null
-                                            dragOffsetY = 0f
-                                        },
+                                            },
+                                            onDragEnd = {
+                                                draggedId = null
+                                                dragOffsetY = 0f
+                                            },
+                                            onDragCancel = {
+                                                draggedId = null
+                                                dragOffsetY = 0f
+                                            },
+                                        )
+                                    },
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            ColorDot(color = player.color, onPick = { paletteFor = player })
+                            Spacer(modifier = Modifier.width(4.dp))
+                            RosterNameField(
+                                key = player.id,
+                                initial = player.name,
+                                defaultName = "Player ${game.players.indexOfFirst { p -> p.id == player.id } + 1}",
+                                color = Color(player.color),
+                                onRename = { viewModel.renamePlayer(player.id, it) },
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (game.players.size > 1) {
+                                IconButton(
+                                    onClick = { viewModel.removePlayer(player.id) },
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Remove player",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
-                                },
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        ColorDot(color = player.color, onPick = { paletteFor = player })
-                        Spacer(modifier = Modifier.width(4.dp))
-                        RosterNameField(
-                            key = player.id,
-                            initial = player.name,
-                            defaultName = "Player ${game.players.indexOfFirst { p -> p.id == player.id } + 1}",
-                            color = Color(player.color),
-                            onRename = { viewModel.renamePlayer(player.id, it) },
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (game.players.size > 1) {
-                            IconButton(
-                                onClick = { viewModel.removePlayer(player.id) },
-                                modifier = Modifier.size(32.dp),
+                                }
+                            }
+                        }
+                        // The wizard's numbered chips: tap to move this
+                        // player onto that team (shown only when teams are
+                        // on). Indented to sit under the name field.
+                        if (teamMode) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 72.dp, bottom = 8.dp),
                             ) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Remove player",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                TeamChipRow(
+                                    player = player,
+                                    teams = game.teams,
+                                    // Same rule as the wizard: reassigning
+                                    // must never shrink the team list; teams
+                                    // are deleted explicitly on their cards.
+                                    onAssign = { viewModel.assignPlayer(player.id, it, keepEmpty = true) },
                                 )
                             }
                         }
@@ -1068,6 +1090,48 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
             },
             onDismiss = { teamPaletteFor = null },
         )
+    }
+}
+
+/**
+ * The numbered team chips shown under a roster row — tap one to move the
+ * player onto that team; the filled chip with the checkmark marks the
+ * current team. Shared by the setup wizard and Roster Setup.
+ */
+@Composable
+internal fun TeamChipRow(
+    player: Player,
+    teams: List<Team>,
+    onAssign: (String) -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        teams.forEachIndexed { index, team ->
+            val assigned = player.teamId == team.id
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(if (assigned) Color(team.color) else Color.Transparent)
+                    .border(2.dp, Color(team.color), CircleShape)
+                    .clickable { onAssign(team.id) },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (assigned) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp),
+                    )
+                } else {
+                    Text(
+                        "${index + 1}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(team.color),
+                    )
+                }
+            }
+        }
     }
 }
 

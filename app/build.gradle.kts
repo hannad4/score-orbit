@@ -14,8 +14,8 @@ android {
         applicationId = "com.scoreorbit.android"
         minSdk = 24
         targetSdk = 34
-        versionCode = 13
-        versionName = "1.13.0"
+        versionCode = 14
+        versionName = "1.14.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
         // Only English strings ship: library language packs for other
