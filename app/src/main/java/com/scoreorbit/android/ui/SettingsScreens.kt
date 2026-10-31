@@ -808,7 +808,6 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
     var latestGame by remember { mutableStateOf(game) }
     latestGame = game
     var paletteFor by remember { mutableStateOf<Player?>(null) }
-    var teamPaletteFor by remember { mutableStateOf<Team?>(null) }
     val listState = rememberLazyListState()
     // Long-press-drag reorder state. The dragged card follows the finger via
     // graphicsLayer (placement untouched); neighbors swap live underneath.
@@ -871,7 +870,7 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    if (teamMode) "Drag the handle to reorder \u2022 tap a numbered chip to move a player between teams"
+                    if (teamMode) "Drag the handle to reorder \u2022 tap a numbered chip to move a player between teams, or drag players between teams on the main page"
                     else "Drag the handle to reorder",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -886,60 +885,6 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                     contentAlignment = Alignment.Center,
                 ) {
                     RingPreview(players = game.players)
-                }
-            }
-            // Teams live above the roster: color, name, members, delete.
-            // Hidden entirely in Individual mode.
-            if (teamMode) {
-                item {
-                    Text(
-                        "Teams",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                items(game.teams, key = { it.id }) { team ->
-                    val members = game.players.filter { p -> p.teamId == team.id }
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer
-                        ),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            ColorDot(color = team.color, onPick = { teamPaletteFor = team })
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                RosterNameField(
-                                    key = team.id,
-                                    initial = team.name,
-                                    defaultName = "",
-                                    color = Color(team.color),
-                                    onRename = { viewModel.renameTeam(team.id, it) },
-                                )
-                                Text(
-                                    if (members.isEmpty()) "No players yet"
-                                    else members.joinToString { it.name },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            IconButton(
-                                onClick = { viewModel.deleteTeam(team.id) },
-                                modifier = Modifier.size(32.dp),
-                            ) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Delete team",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
                 }
             }
             items(game.players, key = { it.id }) { player ->
@@ -1079,16 +1024,6 @@ fun PlayerSetupScreen(game: Game, viewModel: ScoreViewModel) {
                 paletteFor = null
             },
             onDismiss = { paletteFor = null },
-        )
-    }
-    teamPaletteFor?.let { team ->
-        ColorPaletteDialog(
-            selected = team.color,
-            onPick = {
-                viewModel.recolorTeam(team.id, it)
-                teamPaletteFor = null
-            },
-            onDismiss = { teamPaletteFor = null },
         )
     }
 }
