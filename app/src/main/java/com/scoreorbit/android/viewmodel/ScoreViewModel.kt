@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.scoreorbit.android.model.Game
 import com.scoreorbit.android.model.MAX_TIMER_SEC
 import com.scoreorbit.android.model.MIN_TIMER_SEC
+import com.scoreorbit.android.model.MIN_TIMER_STEP_SEC
 import com.scoreorbit.android.model.Player
 import com.scoreorbit.android.model.Rotation
 import com.scoreorbit.android.model.ScoreEntry
@@ -285,7 +286,8 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Board timer +/-: moves between multiples of 5 seconds rather than a
      * fixed step, so a reading mid-slide always lands on a clean number.
-     * From 1:12, + goes to 1:15, + again to 1:20; 1:12, − goes to 1:10.
+     * From 1:12, + goes to 1:15, + again to 1:20; 1:12, − goes to 1:10,
+     * and going all the way down bottoms out at 5 seconds.
      * [deltaSec] only picks the direction.
      */
     fun timerAdjust(deltaSec: Int) {
@@ -295,7 +297,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         fun step(from: Long): Long {
             val base = from / 5L * 5L
             val moving = if (deltaSec > 0) base + 5L else if (base == from) base - 5L else base
-            return moving.coerceIn(MIN_TIMER_SEC.toLong(), MAX_TIMER_SEC.toLong())
+            return moving.coerceIn(MIN_TIMER_STEP_SEC.toLong(), MAX_TIMER_SEC.toLong())
         }
         if (_timerRunning.value) {
             // Running: shifts the deadline only; the armed duration is

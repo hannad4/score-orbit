@@ -182,11 +182,17 @@ class ScoreViewModelTest {
         viewModel.timerAdjust(-5) // 30
         viewModel.timerAdjust(-5) // 25
         viewModel.timerAdjust(-5) // 20
-        viewModel.timerAdjust(-5) // 15: the floor
+        viewModel.timerAdjust(-5) // 15
+        // Below the 15-second default, minus keeps walking to 10 then 5.
         viewModel.timerAdjust(-5)
-        assertEquals(15_000L, viewModel.timerMs.value) // the 15-second floor stops it
+        assertEquals(10_000L, viewModel.timerMs.value)
+        viewModel.timerAdjust(-5)
+        assertEquals(5_000L, viewModel.timerMs.value)
+        // 5 seconds is the bottom stop.
+        viewModel.timerAdjust(-5)
+        assertEquals(5_000L, viewModel.timerMs.value)
         // And plus walks back up from the floor in full steps.
         viewModel.timerAdjust(5)
-        assertEquals(20_000L, viewModel.timerMs.value)
+        assertEquals(10_000L, viewModel.timerMs.value)
     }
 }

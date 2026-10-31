@@ -10,13 +10,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.filled.Replay
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.buildAnnotatedString
 import com.scoreorbit.android.model.MAX_TIMER_SEC
 import com.scoreorbit.android.model.MIN_TIMER_SEC
 import kotlin.math.abs
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -63,7 +70,30 @@ internal fun TimerDurationRow(seconds: Int, onChange: (Int) -> Unit) {
     ListItem(
         modifier = Modifier.clickable { open = true },
         headlineContent = { Text("Default Duration") },
-        supportingContent = { Text("What the timer starts at, and what Reset goes back to") },
+        supportingContent = {
+            val resetIcon = "resetic"
+            Text(
+                buildAnnotatedString {
+                    append("What the timer starts at, and what ")
+                    appendInlineContent(resetIcon, "[reset]")
+                    append(" goes back to")
+                },
+                inlineContent = mapOf(
+                    resetIcon to InlineTextContent(
+                        Placeholder(16.sp, 16.sp, PlaceholderVerticalAlign.TextCenter)
+                    ) {
+                        Icon(
+                            Icons.Default.Replay,
+                            contentDescription = "Reset",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    },
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
         leadingContent = {
             Icon(
                 Icons.Default.Schedule,

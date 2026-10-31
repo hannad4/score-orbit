@@ -2419,7 +2419,7 @@ internal fun TurnTimerBar(
                 // minus on the left, plus on the right, both taking 5-second steps.
                 IconButton(
                     onClick = { onAdjust(-5) },
-                    enabled = !timerRunning || timerMs > 15_000L,
+                    enabled = !timerRunning || timerMs > 5_000L,
                 ) {
                     Icon(Icons.Default.Remove, contentDescription = "Subtract 5 seconds")
                 }

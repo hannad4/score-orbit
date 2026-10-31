@@ -2,6 +2,12 @@ package com.scoreorbit.android.model
 
 /** Shortest and longest turn timer, in seconds (15s to 999:59). */
 const val MIN_TIMER_SEC = 15
+/**
+ * Floor for the board's live +/− stepping only. The clock can walk below
+ * the 15-second default (down to 10, then 5); the duration picker still
+ * bottoms out at MIN_TIMER_SEC.
+ */
+const val MIN_TIMER_STEP_SEC = 5
 const val MAX_TIMER_SEC = 999 * 60 + 59
 
 data class Player(
