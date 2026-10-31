@@ -419,7 +419,7 @@ private fun WinningPage() {
         WizardBullet(dots[0], "Trophies mark the top three scores.")
         WizardBullet(dots[1], "Tap ", Icons.Default.Leaderboard, " to see every score.")
         WizardBullet(dots[2], "Pick ", Icons.Default.Settings, " whether highest or lowest wins.")
-        WizardBullet(dots[3], "Set a Score to Win and the game ends in confetti. Leave it blank to keep going.")
+        WizardBullet(dots[3], "Set a Score Goal and the game ends in confetti. Leave it blank to keep going.")
     }
 }
 
@@ -432,7 +432,7 @@ private fun ToolsPage() {
     ) {
         WizardBullet(wizardDots()[0], "Tap ", Icons.Default.History, " to undo or redo a score.")
         WizardBullet(wizardDots()[1], "Tap ", Icons.Default.Timer, " to set a countdown timer.")
-        WizardBullet(wizardDots()[2], "Tap ", Icons.Default.Settings, " for teams, scoring rules, Score to Win and more.")
+        WizardBullet(wizardDots()[2], "Tap ", Icons.Default.Settings, " for teams, scoring rules, Score Goal and more.")
     }
 }
 

@@ -236,12 +236,14 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                 }
 
                 SettingsGroup(label = "Players") {
-                    // Stepper for the player count (free range, so a stepper
-                    // fits); teams below as pills — the sensible team counts
-                    // are a fixed choice, not a range.
+                    // One pickers row, scoring-card style: players step in a
+                    // free range, teams step over the fixed list of counts
+                    // (None, 2, 3, 4) — the sensible team counts aren't
+                    // contiguous, so the stepper walks that list.
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
                     ) {
                         StepperCell(
                             value = "${game.players.size}",
@@ -250,39 +252,36 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                             onPlus = { viewModel.setPlayerCount(game.players.size + 1) },
                             minusEnabled = game.players.size > 1,
                             plusEnabled = game.players.size < 12,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                            modifier = Modifier.weight(1f),
+                        )
+                        StepperCell(
+                            value = if (game.teams.isEmpty()) "None" else "${game.teams.size}",
+                            caption = "Number of Teams",
+                            onMinus = {
+                                val options = listOf(0, 2, 3, 4)
+                                val i = options.indexOf(game.teams.size).let { if (it < 0) 0 else it }
+                                viewModel.setTeamCount(options[(i - 1).coerceAtLeast(0)])
+                            },
+                            onPlus = {
+                                val options = listOf(0, 2, 3, 4)
+                                val i = options.indexOf(game.teams.size).let { if (it < 0) 0 else it }
+                                viewModel.setTeamCount(options[(i + 1).coerceAtMost(options.lastIndex)])
+                            },
+                            minusEnabled = game.teams.isNotEmpty(),
+                            plusEnabled = game.teams.size < 4,
+                            modifier = Modifier.weight(1f),
                         )
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        Text(
-                            "Number of Teams",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        val teamOptions = listOf(0, 2, 3, 4)
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            teamOptions.forEachIndexed { i, count ->
-                                SegmentedButton(
-                                    selected = game.teams.size == count,
-                                    onClick = { viewModel.setTeamCount(count) },
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = i,
-                                        count = teamOptions.size,
-                                    ),
-                                ) {
-                                    Text(if (count == 0) "Solo" else "$count")
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            "Players are dealt evenly at random; tap a chip to move a player between teams.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    Text(
+                        "Players are dealt evenly at random; tap a chip to move a player between teams.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     // The roster made up like the setup wizard: dot to
                     // recolor, name field, and team chips under each player.
@@ -363,7 +362,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                     OutlinedTextField(
                         value = targetField,
                         onValueChange = { targetField = it.filter { c -> c.isDigit() }.take(5) },
-                        label = { Text("Score to Win") },
+                        label = { Text("Score Goal") },
                         supportingText = { Text("Blank for endless scoring") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
