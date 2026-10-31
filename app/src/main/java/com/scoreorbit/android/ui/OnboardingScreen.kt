@@ -43,9 +43,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -460,50 +457,17 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
             ),
         ) {
             Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    StepperCell(
-                        value = "${game.players.size}",
-                        caption = "Number of Players",
-                        onMinus = { viewModel.setPlayerCount(game.players.size - 1) },
-                        onPlus = { viewModel.setPlayerCount(game.players.size + 1) },
-                        minusEnabled = game.players.size > 1,
-                        plusEnabled = game.players.size < 12,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
-                    )
-                }
+                PlayerTeamSteppers(game, viewModel)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    Text(
-                        "Teams",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    val teamOptions = listOf(0, 2, 3, 4)
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        teamOptions.forEachIndexed { i, count ->
-                            SegmentedButton(
-                                selected = game.teams.size == count,
-                                onClick = { viewModel.setTeamCount(count) },
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index = i,
-                                    count = teamOptions.size,
-                                ),
-                            ) {
-                                Text(if (count == 0) "Solo" else "$count")
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        "Players are split evenly at random; tap a chip to move a player between teams.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    "Drag a player's score on the main page to change their team assignment.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Column(
                     modifier = Modifier

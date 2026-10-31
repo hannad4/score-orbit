@@ -537,7 +537,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         _currentGame.value = game.copy(
             players = filled,
             entries = game.entries.filter { it.playerId in ids },
-        ).pruned()
+        ).pruned(keepEmpty = true)
         undoStack.clear()
         redoStack.clear()
         persist()
@@ -555,7 +555,7 @@ class ScoreViewModel(application: Application) : AndroidViewModel(application) {
         _currentGame.value = game.copy(
             players = game.players.filterNot { it.id == playerId },
             entries = game.entries.filterNot { it.playerId == playerId },
-        ).pruned()
+        ).pruned(keepEmpty = true)
         undoStack.clear()
         redoStack.clear()
         persist()

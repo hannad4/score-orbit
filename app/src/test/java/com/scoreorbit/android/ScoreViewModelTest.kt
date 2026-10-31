@@ -119,6 +119,29 @@ class ScoreViewModelTest {
     }
 
     @Test
+    fun playerCountChange_keepsTeamCount() {
+        val viewModel = makeViewModel()
+        viewModel.setPlayerCount(6)
+        viewModel.setTeamCount(4)
+        assertEquals(4, checkNotNull(viewModel.currentGame.value).teams.size)
+
+        // Shrinking players strands two teams with nobody on them; changing
+        // the player count must never also change the team count. The kept
+        // teams are still assignable from the chips.
+        viewModel.setPlayerCount(2)
+        val shrunk = checkNotNull(viewModel.currentGame.value)
+        assertEquals(4, shrunk.teams.size)
+        assertEquals(2, shrunk.players.size)
+
+        // And growing back joins the new player to a team without touching
+        // the team list either.
+        viewModel.setPlayerCount(3)
+        val grown = checkNotNull(viewModel.currentGame.value)
+        assertEquals(4, grown.teams.size)
+        assertEquals(3, grown.players.size)
+    }
+
+    @Test
     fun timerAdjust_stepsBetweenFiveSecondQuantums() {
         val viewModel = makeViewModel()
         viewModel.setTimerStartSec(120) // armed at 2:00

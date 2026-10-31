@@ -236,45 +236,10 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                 }
 
                 SettingsGroup(label = "Players") {
-                    // One pickers row, scoring-card style: players step in a
-                    // free range, teams step over the fixed list of counts
-                    // (None, 2, 3, 4) — the sensible team counts aren't
-                    // contiguous, so the stepper walks that list.
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
-                    ) {
-                        StepperCell(
-                            value = "${game.players.size}",
-                            caption = "Number of Players",
-                            onMinus = { viewModel.setPlayerCount(game.players.size - 1) },
-                            onPlus = { viewModel.setPlayerCount(game.players.size + 1) },
-                            minusEnabled = game.players.size > 1,
-                            plusEnabled = game.players.size < 12,
-                            modifier = Modifier.weight(1f),
-                        )
-                        StepperCell(
-                            value = if (game.teams.isEmpty()) "None" else "${game.teams.size}",
-                            caption = "Number of Teams",
-                            onMinus = {
-                                val options = listOf(0, 2, 3, 4)
-                                val i = options.indexOf(game.teams.size).let { if (it < 0) 0 else it }
-                                viewModel.setTeamCount(options[(i - 1).coerceAtLeast(0)])
-                            },
-                            onPlus = {
-                                val options = listOf(0, 2, 3, 4)
-                                val i = options.indexOf(game.teams.size).let { if (it < 0) 0 else it }
-                                viewModel.setTeamCount(options[(i + 1).coerceAtMost(options.lastIndex)])
-                            },
-                            minusEnabled = game.teams.isNotEmpty(),
-                            plusEnabled = game.teams.size < 4,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
+                    PlayerTeamSteppers(game, viewModel)
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Text(
-                        "Players are dealt evenly at random; tap a chip to move a player between teams.",
+                        "Drag a player's score on the main page to change their team assignment.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -714,6 +679,48 @@ private fun SettingsGroup(label: String, content: @Composable () -> Unit) {
         ) {
             content()
         }
+    }
+}
+
+/**
+ * Twin steppers for the setup surfaces: players step in a free range
+ * (1–12), teams step over the fixed list of sensible counts — None (0),
+ * 2, 3, 4 — shown as 0 when teams are off. Shared by Settings and the
+ * setup wizard.
+ */
+@Composable
+internal fun PlayerTeamSteppers(game: Game, viewModel: ScoreViewModel) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+    ) {
+        StepperCell(
+            value = "${game.players.size}",
+            caption = "Number of Players",
+            onMinus = { viewModel.setPlayerCount(game.players.size - 1) },
+            onPlus = { viewModel.setPlayerCount(game.players.size + 1) },
+            minusEnabled = game.players.size > 1,
+            plusEnabled = game.players.size < 12,
+            modifier = Modifier.weight(1f),
+        )
+        StepperCell(
+            value = "${game.teams.size}",
+            caption = "Number of Teams",
+            onMinus = {
+                val options = listOf(0, 2, 3, 4)
+                val i = options.indexOf(game.teams.size).let { if (it < 0) 0 else it }
+                viewModel.setTeamCount(options[(i - 1).coerceAtLeast(0)])
+            },
+            onPlus = {
+                val options = listOf(0, 2, 3, 4)
+                val i = options.indexOf(game.teams.size).let { if (it < 0) 0 else it }
+                viewModel.setTeamCount(options[(i + 1).coerceAtMost(options.lastIndex)])
+            },
+            minusEnabled = game.teams.isNotEmpty(),
+            plusEnabled = game.teams.size < 4,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
