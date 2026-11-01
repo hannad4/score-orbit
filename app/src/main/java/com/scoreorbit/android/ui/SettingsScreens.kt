@@ -475,7 +475,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ListItem(
                         headlineContent = { Text("Haptics") },
-                        supportingContent = { Text("Buzz on every full turn") },
+                        supportingContent = { Text("Buzz on every point") },
                         leadingContent = {
                             Icon(
                                 Icons.Default.Vibration,
@@ -595,7 +595,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                 ListItem(
                     headlineContent = { Text("App version") },
                     supportingContent = {
-                        Text("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+                        Text("v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
                     },
                     leadingContent = {
                         Icon(
