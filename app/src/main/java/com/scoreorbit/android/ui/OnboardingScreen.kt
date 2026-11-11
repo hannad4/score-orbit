@@ -461,7 +461,7 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
                 PlayerTeamSteppers(game, viewModel)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Text(
-                    "Drag a player's score on the main page to change their team assignment. Swipe a player left here to remove them.",
+                    "Drag a player's score on the main page to change their team assignment. Tap the X beside a player to remove them.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

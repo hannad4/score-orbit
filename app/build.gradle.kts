@@ -14,7 +14,7 @@ android {
         applicationId = "com.scoreorbit.android"
         minSdk = 24
         targetSdk = 34
-        versionCode = 21
+        versionCode = 22
         versionName = "1.11"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }

@@ -1,8 +1,6 @@
 package com.scoreorbit.android.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,8 +10,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,7 +36,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -49,7 +44,6 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
@@ -97,7 +91,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -110,10 +103,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -247,7 +237,7 @@ fun SettingsScreen(game: Game?, viewModel: ScoreViewModel, scrollState: ScrollSt
                     PlayerTeamSteppers(game, viewModel)
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Text(
-                        "Drag a player's score on the main page to change their team assignment. Swipe a player left here to remove them.",
+                        "Drag a player's score on the main page to change their team assignment. Tap the X beside a player to remove them.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -816,9 +806,10 @@ internal fun HoldRepeatButton(
 
 /**
  * One roster row for any setup surface: color dot (tap to pick), name
- * field, and — when teams exist — a chip per team on a second line.
- * Swiping the row left removes the player (hidden while a single player
- * remains). Used by the setup wizard and the Players section in Settings.
+ * field, and — when teams exist — a chip per team on a second line. The
+ * X beside the name removes the player; with a single player it is
+ * replaced by an empty gap (the table can't go empty). Used by the setup
+ * wizard and the Players section in Settings.
  */
 @Composable
 internal fun PlayerRosterRow(
@@ -828,131 +819,54 @@ internal fun PlayerRosterRow(
     viewModel: ScoreViewModel,
     onPickColor: () -> Unit,
 ) {
-    // Swipe-left to remove. Disabled while a single player remains —
-    // the table can't go empty.
+    // One player must always remain — the table can't go empty.
     val canRemove = game.players.size > 1
-    val scope = rememberCoroutineScope()
-    // Row offset while dragging; 0 at rest. The settle animation glides it
-    // back after an unconfirmed swipe.
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    val settle = remember { mutableStateOf<Job?>(null) }
-
-    Box(modifier = Modifier.fillMaxWidth()) {
-        // Delete reveal behind the row; covered by the row's own surface
-        // until the row is actually dragged aside.
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.errorContainer),
-            contentAlignment = Alignment.CenterEnd,
-        ) {
-            Icon(
-                Icons.Default.Delete,
-                contentDescription = "Remove player",
-                tint = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.padding(horizontal = 20.dp),
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ColorDot(color = player.color, onPick = onPickColor)
+            Spacer(modifier = Modifier.width(8.dp))
+            RosterNameField(
+                key = player.id,
+                initial = player.name,
+                defaultName = "Player ${index + 1}",
+                color = Color(player.color),
+                onRename = { viewModel.renamePlayer(player.id, it) },
+                modifier = Modifier.weight(1f),
             )
-        }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .graphicsLayer { translationX = offsetX }
-                // Claim horizontal drags on the Initial pointer pass, before
-                // the name field (and, in the wizard, the page pager) can
-                // take them. Taps and vertical scrolling are left alone.
-                .pointerInput(player.id, canRemove) {
-                    val revealPx = 96.dp.toPx()
-                    val slopPx = viewConfiguration.touchSlop
-                    val confirmPx = revealPx * 0.6f
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                        settle.value?.cancel()
-                        var dxTotal = 0f
-                        var dyTotal = 0f
-                        var lastX = down.position.x
-                        var lastY = down.position.y
-                        var claimed = false
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                            val change =
-                                event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (claimed) {
-                                // The row owns this gesture; keep children and
-                                // the pager from seeing any of it, including
-                                // the final up.
-                                event.changes.forEach { it.consume() }
-                                if (change.pressed) {
-                                    val dx = change.position.x - lastX
-                                    lastX = change.position.x
-                                    offsetX = (offsetX + dx).coerceIn(-revealPx, 0f)
-                                } else {
-                                    break
-                                }
-                            } else {
-                                if (!change.pressed) break
-                                dxTotal += change.position.x - lastX
-                                dyTotal += change.position.y - lastY
-                                lastX = change.position.x
-                                lastY = change.position.y
-                                if (abs(dxTotal) > slopPx) {
-                                    if (abs(dxTotal) > abs(dyTotal) && dxTotal < 0) {
-                                        claimed = canRemove
-                                    } else {
-                                        // Rightward or a vertical scroll; not
-                                        // ours. Stop watching either way.
-                                        break
-                                    }
-                                }
-                            }
-                        }
-                        if (claimed && canRemove && offsetX <= -confirmPx) {
-                            viewModel.removePlayer(player.id)
-                        } else if (offsetX != 0f) {
-                            // Unconfirmed swipe or interrupted settle: glide back.
-                            settle.value = scope.launch {
-                                animate(
-                                    initialValue = offsetX,
-                                    targetValue = 0f,
-                                    animationSpec = tween(150),
-                                ) { value: Float, _: Float -> offsetX = value }
-                            }
-                        }
-                    }
-                }
-                // Solid surface so the red reveal only shows while dragging.
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(vertical = 4.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ColorDot(color = player.color, onPick = onPickColor)
-                Spacer(modifier = Modifier.width(8.dp))
-                RosterNameField(
-                    key = player.id,
-                    initial = player.name,
-                    defaultName = "Player ${index + 1}",
-                    color = Color(player.color),
-                    onRename = { viewModel.renamePlayer(player.id, it) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            if (game.teams.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 48.dp, top = 2.dp),
-                ) {
-                    TeamChipRow(
-                        player = player,
-                        teams = game.teams,
-                        onAssign = {
-                            // Reassigning must never shrink the team list here:
-                            // counts change explicitly through the pills, and an
-                            // empty team dying mid-edit looks like a glitch.
-                            viewModel.assignPlayer(player.id, it, keepEmpty = true)
-                        },
+            if (canRemove) {
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(onClick = { viewModel.removePlayer(player.id) }) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Remove player",
+                        tint = MaterialTheme.colorScheme.error,
                     )
                 }
+            } else {
+                // Empty gap keeps every row's field width identical.
+                Spacer(modifier = Modifier.width(52.dp))
+            }
+        }
+        if (game.teams.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 48.dp, top = 2.dp),
+            ) {
+                TeamChipRow(
+                    player = player,
+                    teams = game.teams,
+                    onAssign = {
+                        // Reassigning must never shrink the team list here:
+                        // counts change explicitly through the pills, and an
+                        // empty team dying mid-edit looks like a glitch.
+                        viewModel.assignPlayer(player.id, it, keepEmpty = true)
+                    },
+                )
             }
         }
     }
@@ -962,7 +876,8 @@ internal fun PlayerRosterRow(
  * The numbered team chips shown under a roster row — tap one to move the
  * player onto that team; the filled chip with the checkmark marks the
  * current team. Shared by the setup wizard and Roster Setup.
- */@Composable
+ */
+@Composable
 internal fun TeamChipRow(
     player: Player,
     teams: List<Team>,
