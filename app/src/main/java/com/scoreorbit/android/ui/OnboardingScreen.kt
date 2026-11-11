@@ -48,6 +48,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -460,7 +461,7 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
                 PlayerTeamSteppers(game, viewModel)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Text(
-                    "Drag a player's score on the main page to change their team assignment.",
+                    "Drag a player's score on the main page to change their team assignment. Swipe a player left here to remove them.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -483,8 +484,10 @@ private fun TableSetupPage(game: Game, viewModel: ScoreViewModel) {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     game.players.forEachIndexed { index, player ->
-                        PlayerRosterRow(index, player, game, viewModel,
-                            onPickColor = { colorFor = player })
+                        key(player.id) {
+                            PlayerRosterRow(index, player, game, viewModel,
+                                onPickColor = { colorFor = player })
+                        }
                     }
                 }
             }

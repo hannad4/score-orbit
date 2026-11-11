@@ -119,6 +119,28 @@ class ScoreViewModelTest {
     }
 
     @Test
+    fun removePlayer_keepsTeamCount() {
+        val viewModel = makeViewModel()
+        viewModel.setPlayerCount(3)
+        viewModel.setTeamCount(2)
+        val before = checkNotNull(viewModel.currentGame.value)
+        assertEquals(2, before.teams.size)
+
+        // Removing a player must never touch the team list; an emptied
+        // team stays on the chips for the remaining players.
+        viewModel.removePlayer(before.players[0].id)
+        val after = checkNotNull(viewModel.currentGame.value)
+        assertEquals(2, after.players.size)
+        assertEquals(2, after.teams.size)
+        assertEquals(before.teams.map { it.id }, after.teams.map { it.id })
+
+        // And the last remaining player can't be removed at all.
+        viewModel.removePlayer(after.players[0].id)
+        val final = checkNotNull(viewModel.currentGame.value)
+        assertEquals(1, final.players.size)
+    }
+
+    @Test
     fun playerCountChange_keepsTeamCount() {
         val viewModel = makeViewModel()
         viewModel.setPlayerCount(6)
